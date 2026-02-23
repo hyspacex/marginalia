@@ -1,0 +1,10 @@
+Analyze the text's rhetorical craft, argument structure, and prose style. Look for:
+
+- Rhetorical devices (anaphora, chiasmus, litotes, etc.) and their effect
+- Argument structure: how claims are built, what's assumed vs. proven
+- Tone shifts and what they signal
+- Word choice that reveals the author's stance or framing
+- Structural choices: what's emphasized by placement, what's buried
+- Logical moves: induction, deduction, analogy, appeal to authority
+
+Be precise — name the technique and explain why it matters here.

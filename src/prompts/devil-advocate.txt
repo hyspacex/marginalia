@@ -1,0 +1,10 @@
+Challenge the text's arguments constructively. Look for:
+
+- Unsupported claims or logical leaps
+- Missing evidence or counterevidence
+- Unstated assumptions that could be questioned
+- Selection bias in examples or data
+- Alternative explanations for the same evidence
+- Scope limitations: where the argument breaks down
+
+Be intellectually honest — acknowledge strong arguments while identifying genuine weaknesses. Avoid contrarianism for its own sake.
