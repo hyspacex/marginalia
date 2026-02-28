@@ -1,15 +1,6 @@
-import type { AnnotationRequest, AnnotationMode, ReaderProfile, SessionState, MemoryPromptFragment } from '@/shared/types';
-import { MODE_LABELS } from '@/shared/constants';
+import type { AnnotationRequest, ReaderProfile, SessionState, MemoryPromptFragment } from '@/shared/types';
 import basePrompt from '@/prompts/base.txt?raw';
-import closeReadingPrompt from '@/prompts/close-reading.txt?raw';
-import contextPrompt from '@/prompts/context.txt?raw';
-import devilAdvocatePrompt from '@/prompts/devil-advocate.txt?raw';
-
-const modePrompts: Record<AnnotationMode, string> = {
-  'close-reading': closeReadingPrompt,
-  'context': contextPrompt,
-  'devil-advocate': devilAdvocatePrompt,
-};
+import annotatePrompt from '@/prompts/annotate.txt?raw';
 
 function buildMemorySection(memory: MemoryPromptFragment): string {
   const parts: string[] = [];
@@ -31,25 +22,10 @@ function buildMemorySection(memory: MemoryPromptFragment): string {
     : '';
 }
 
-function buildModeInstructions(modes: AnnotationMode[]): string {
-  return modes
-    .map((mode) => `### ${MODE_LABELS[mode]}\n\n${modePrompts[mode]}`)
-    .join('\n\n');
-}
-
 export function buildAnnotationPrompt(request: AnnotationRequest): { system: string; user: string } {
-  const modeInstructions = buildModeInstructions(request.modes);
   const memorySection = buildMemorySection(request.memoryContext);
-  const modeList = request.modes.map((m) => MODE_LABELS[m]).join(', ');
-
-  const system = `${basePrompt}\n\n## Active Modes\n\n${modeInstructions}${memorySection}`;
-
-  let user: string;
-  if (request.selectedText) {
-    user = `The reader has selected the following passage for annotation:\n\n<selected_text>\n${request.selectedText}\n</selected_text>\n\nFrom the page "${request.title}" (${request.url}):\n\n<page_content>\n${request.pageContent.slice(0, 12000)}\n</page_content>\n\nGenerate annotations for the selected passage using these modes: ${modeList}`;
-  } else {
-    user = `Page: "${request.title}" (${request.url})\n\n<page_content>\n${request.pageContent.slice(0, 12000)}\n</page_content>\n\nGenerate annotations for this page using these modes: ${modeList}`;
-  }
+  const system = `${basePrompt}\n\n## Annotation Guidelines\n\n${annotatePrompt}${memorySection}`;
+  const user = `Page: "${request.title}" (${request.url})\n\n<page_content>\n${request.pageContent.slice(0, 12000)}\n</page_content>\n\nGenerate 3-5 inline annotations for this article.`;
 
   return { system, user };
 }
@@ -63,10 +39,10 @@ export function buildProfileUpdatePrompt(
 The profile JSON must have these fields:
 - expertise: Record<string, "beginner" | "intermediate" | "advanced">
 - interests: string[]
-- annotationPreferences: { defaultModes: string[], depth: "brief" | "detailed", tone: "academic" | "collegial" | "casual" }
+- annotationPreferences: { depth: "brief" | "detailed", tone: "academic" | "collegial" | "casual" }
 - readingGoals: string[]`;
 
-  const user = `Current profile:\n${JSON.stringify(current, null, 2)}\n\nSession summary:\n- URL: ${session.url}\n- Title: ${session.title}\n- Modes used: ${session.modes.join(', ')}\n- Annotations generated: ${session.annotations.length}\n- Interactions: ${session.interactions.map((i) => `${i.type}${i.text ? `: ${i.text}` : ''}`).join('; ') || 'none'}\n- Duration: ${Math.round((session.lastActiveAt - session.startedAt) / 1000)}s\n\nOutput the updated profile JSON:`;
+  const user = `Current profile:\n${JSON.stringify(current, null, 2)}\n\nSession summary:\n- URL: ${session.url}\n- Title: ${session.title}\n- Annotations generated: ${session.annotations.length}\n- Interactions: ${session.interactions.map((i) => `${i.type}${i.text ? `: ${i.text}` : ''}`).join('; ') || 'none'}\n- Duration: ${Math.round((session.lastActiveAt - session.startedAt) / 1000)}s\n\nOutput the updated profile JSON:`;
 
   return { system, user };
 }

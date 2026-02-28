@@ -1,6 +1,5 @@
 import type {
   Annotation,
-  AnnotationMode,
   AnnotationRequest,
   AnnotationResponse,
   ProviderConfig,
@@ -25,17 +24,16 @@ interface AnthropicRequest {
   stream?: boolean;
 }
 
-function parseAnnotationLines(text: string, modes: AnnotationMode[]): Annotation[] {
+function parseAnnotationLines(text: string): Annotation[] {
   const annotations: Annotation[] = [];
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || !trimmed.startsWith('{')) continue;
     try {
       const parsed = JSON.parse(trimmed);
-      if (parsed.mode && parsed.content) {
+      if (parsed.anchor && parsed.content) {
         annotations.push({
           id: crypto.randomUUID(),
-          mode: parsed.mode as AnnotationMode,
           content: parsed.content,
           anchor: parsed.anchor,
           timestamp: Date.now(),
@@ -99,7 +97,7 @@ export const anthropicProvider: LLMProvider = {
 
     const data = await res.json();
     const text = data.content?.[0]?.text || '';
-    const annotations = parseAnnotationLines(text, request.modes);
+    const annotations = parseAnnotationLines(text);
     const usage: TokenUsage = {
       inputTokens: data.usage?.input_tokens || 0,
       outputTokens: data.usage?.output_tokens || 0,
@@ -159,10 +157,9 @@ export const anthropicProvider: LLMProvider = {
               if (!trimmed || !trimmed.startsWith('{')) continue;
               try {
                 const parsed = JSON.parse(trimmed);
-                if (parsed.mode && parsed.content) {
+                if (parsed.anchor && parsed.content) {
                   onAnnotation({
                     id: crypto.randomUUID(),
-                    mode: parsed.mode as AnnotationMode,
                     content: parsed.content,
                     anchor: parsed.anchor,
                     timestamp: Date.now(),
@@ -193,10 +190,9 @@ export const anthropicProvider: LLMProvider = {
       if (trimmed.startsWith('{')) {
         try {
           const parsed = JSON.parse(trimmed);
-          if (parsed.mode && parsed.content) {
+          if (parsed.anchor && parsed.content) {
             onAnnotation({
               id: crypto.randomUUID(),
-              mode: parsed.mode as AnnotationMode,
               content: parsed.content,
               anchor: parsed.anchor,
               timestamp: Date.now(),

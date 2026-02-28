@@ -70,7 +70,7 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onMessage.addListener(async (msg: PortMessage) => {
     if (msg.type !== 'START_ANNOTATE') return;
 
-    const { url, title, text, selectedText, modes } = msg.payload;
+    const { url, title, text } = msg.payload;
 
     try {
       const config = await getProviderConfig();
@@ -86,7 +86,7 @@ chrome.runtime.onConnect.addListener((port) => {
       // Track session
       const tabId = port.sender?.tab?.id;
       if (tabId) {
-        sessionTracker.startSession(tabId, url, title, modes);
+        sessionTracker.startSession(tabId, url, title);
       }
 
       // Get memory context
@@ -94,8 +94,6 @@ chrome.runtime.onConnect.addListener((port) => {
 
       const request: AnnotationRequest = {
         pageContent: text,
-        selectedText,
-        modes,
         memoryContext,
         url,
         title,

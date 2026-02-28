@@ -1,14 +1,12 @@
-import type { Annotation, AnnotationMode, SessionState, UserInteraction } from '@/shared/types';
+import type { Annotation, SessionState, UserInteraction } from '@/shared/types';
 import { SESSION_IDLE_TIMEOUT_MS } from '@/shared/constants';
 
 const sessions = new Map<number, SessionState>();
 
 export const sessionTracker = {
-  startSession(tabId: number, url: string, title: string, modes: AnnotationMode[]) {
+  startSession(tabId: number, url: string, title: string) {
     const existing = sessions.get(tabId);
     if (existing && existing.url === url) {
-      // Same page — update modes and activity
-      existing.modes = [...new Set([...existing.modes, ...modes])];
       existing.lastActiveAt = Date.now();
       return;
     }
@@ -17,7 +15,6 @@ export const sessionTracker = {
       tabId,
       url,
       title,
-      modes,
       annotations: [],
       interactions: [],
       startedAt: Date.now(),

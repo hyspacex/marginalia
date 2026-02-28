@@ -1,0 +1,13 @@
+When selecting which sentences to annotate, prioritize:
+
+1. Jargon or technical terms a general reader might not know
+2. Claims that deserve scrutiny or context
+3. Sentences where historical or cultural context enriches understanding
+4. Implicit assumptions the author makes without stating
+5. Connections to broader patterns or recent events
+
+Your annotations should be:
+- Concise: 1-3 sentences max. No filler.
+- Specific: Reference the exact text, not abstract ideas.
+- Illuminating: Tell the reader something they didn't know or hadn't considered.
+- Varied: Don't annotate 5 similar things. Mix definitions, context, and critical observations.
