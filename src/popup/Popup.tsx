@@ -1,12 +1,7 @@
 import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import type { AnnotationMode } from '@/shared/types';
-import { MODE_LABELS, MODE_COLORS, DEFAULT_MODES } from '@/shared/constants';
-
-const ALL_MODES: AnnotationMode[] = ['close-reading', 'context', 'devil-advocate'];
 
 function Popup() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [totalTokens, setTotalTokens] = useState(0);
   const [hasApiKey, setHasApiKey] = useState(false);
 
@@ -17,12 +12,11 @@ function Popup() {
     });
   }, []);
 
-  const handleToggle = () => {
+  const handleAnnotate = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_SIDEBAR' }, (response) => {
-          if (response) setSidebarOpen(response.sidebarOpen);
-        });
+        chrome.tabs.sendMessage(tabs[0].id, { type: 'TOGGLE_ANNOTATIONS' });
+        window.close();
       }
     });
   };
@@ -42,8 +36,8 @@ function Popup() {
         </div>
       )}
 
-      <button class="popup-toggle" onClick={handleToggle}>
-        {sidebarOpen ? 'Close Sidebar' : 'Open Sidebar'}
+      <button class="popup-toggle" onClick={handleAnnotate} disabled={!hasApiKey}>
+        Annotate Page
       </button>
 
       <div class="popup-stats">

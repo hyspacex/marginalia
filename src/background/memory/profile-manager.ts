@@ -4,7 +4,6 @@ const DEFAULT_PROFILE: ReaderProfile = {
   expertise: {},
   interests: [],
   annotationPreferences: {
-    defaultModes: ['close-reading', 'context', 'devil-advocate'],
     depth: 'detailed',
     tone: 'collegial',
   },

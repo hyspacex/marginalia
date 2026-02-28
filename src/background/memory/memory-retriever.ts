@@ -36,7 +36,6 @@ function formatSessionContext(tabId: number): string {
   if (!session) return '';
 
   const parts = [`Current page: ${session.title} (${session.url})`];
-  parts.push(`Active modes: ${session.modes.join(', ')}`);
   parts.push(`Annotations so far: ${session.annotations.length}`);
 
   if (session.interactions.length > 0) {
