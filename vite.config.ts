@@ -130,7 +130,7 @@ export default defineConfig({
     // Main build produces nothing — copyExtensionFiles does the real work
     rollupOptions: {
       input: resolve(__dirname, 'src/shared/types.ts'),
-      output: { entryFileNames: '_noop.js' },
+      output: { entryFileNames: 'noop.js' },
     },
   },
   plugins: [copyExtensionFiles()],
