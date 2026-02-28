@@ -53,6 +53,7 @@ export function findTextInDOM(anchor: string, root: Node = document.body): Range
   let matchIndex = fullText.indexOf(anchor);
 
   // Fallback: normalized whitespace match
+  let matchEnd: number;
   if (matchIndex === -1) {
     const normalizedFull = normalizeWhitespace(fullText);
     const normalizedAnchor = normalizeWhitespace(anchor);
@@ -60,21 +61,28 @@ export function findTextInDOM(anchor: string, root: Node = document.body): Range
 
     if (normalizedIndex === -1) return null;
 
-    // Map normalized index back to original index
-    let origIdx = 0;
-    let normIdx = 0;
-    while (origIdx < fullText.length && /\s/.test(fullText[origIdx])) origIdx++;
-
-    while (normIdx < normalizedIndex && origIdx < fullText.length) {
-      origIdx++;
-      if (origIdx < fullText.length && /\s/.test(fullText[origIdx])) {
-        while (origIdx < fullText.length && /\s/.test(fullText[origIdx])) origIdx++;
-        normIdx++;
+    // Build map from normalized position to original position
+    const normToOrig: number[] = [];
+    let inWhitespace = false;
+    for (let i = 0; i < fullText.length; i++) {
+      if (/\s/.test(fullText[i])) {
+        if (!inWhitespace && normToOrig.length > 0) {
+          normToOrig.push(i); // the single normalized space
+        }
+        inWhitespace = true;
       } else {
-        normIdx++;
+        normToOrig.push(i);
+        inWhitespace = false;
       }
     }
-    matchIndex = origIdx;
+
+    matchIndex = normToOrig[normalizedIndex] ?? -1;
+    const normalizedEnd = normalizedIndex + normalizedAnchor.length;
+    matchEnd = normalizedEnd < normToOrig.length
+      ? normToOrig[normalizedEnd]
+      : fullText.length;
+  } else {
+    matchEnd = matchIndex + anchor.length;
   }
 
   if (matchIndex === -1) return null;
@@ -84,8 +92,6 @@ export function findTextInDOM(anchor: string, root: Node = document.body): Range
   let startOffset = 0;
   let endNode: Text | null = null;
   let endOffset = 0;
-
-  const matchEnd = matchIndex + anchor.length;
 
   for (const seg of segments) {
     if (!startNode && matchIndex >= seg.start && matchIndex < seg.end) {

@@ -93,14 +93,17 @@ export interface ProviderConfig {
   baseUrl: string;
 }
 
-// Message protocol
+// Message protocol — service worker messages
 export type RequestMessage =
-  | { type: 'ANNOTATE_PAGE'; payload: { url: string; title: string; text: string } }
   | { type: 'SAVE_ANNOTATION'; payload: { annotation: Annotation } }
   | { type: 'RECORD_INTERACTION'; payload: { interaction: UserInteraction } }
   | { type: 'GET_SESSION'; payload: { tabId: number } }
   | { type: 'END_SESSION'; payload: { tabId: number } }
   | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfig } };
+
+// Message protocol — content script messages (popup → content script)
+export type ContentMessage =
+  | { type: 'TOGGLE_ANNOTATIONS' };
 
 export type ResponseMessage =
   | { type: 'ANNOTATIONS_READY'; payload: { annotations: Annotation[]; usage: TokenUsage } }

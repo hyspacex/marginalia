@@ -1,6 +1,6 @@
 import { render, h } from 'preact';
-import { PORT_NAME } from '@/shared/constants';
-import type { Annotation, PortMessage } from '@/shared/types';
+import { PORT_NAME, HIGHLIGHT_COLORS, CARD_CONFIG } from '@/shared/constants';
+import type { Annotation, PortMessage, ContentMessage } from '@/shared/types';
 import { highlightManager } from './highlighter/highlight-manager';
 import { HoverCard } from './card/HoverCard';
 import { FloatingPill } from './pill/FloatingPill';
@@ -44,9 +44,9 @@ function injectHighlightStyles() {
   style.id = HIGHLIGHT_STYLE_ID;
   style.textContent = `
     ::highlight(marginalia) {
-      background-color: rgba(255, 200, 80, 0.15);
+      background-color: ${HIGHLIGHT_COLORS.background};
       text-decoration: underline dotted;
-      text-decoration-color: rgba(180, 140, 50, 0.5);
+      text-decoration-color: ${HIGHLIGHT_COLORS.underline};
     }
   `;
   document.head.appendChild(style);
@@ -165,7 +165,7 @@ function startAnnotating() {
 }
 
 // --- Message listener (from popup) ---
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
   if (message.type === 'TOGGLE_ANNOTATIONS') {
     if (state.annotations.length === 0 && !annotating) {
       startAnnotating();
@@ -199,7 +199,7 @@ function init() {
       closeTimer = setTimeout(() => {
         setState({ hoverAnnotation: null, hoverRect: null });
         closeTimer = null;
-      }, 200);
+      }, CARD_CONFIG.closeDelay);
     },
   );
 }

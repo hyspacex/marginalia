@@ -32,19 +32,8 @@ function createHitTargets(range: Range, annotation: Annotation): HTMLElement[] {
       width: `${rect.width}px`,
       height: `${rect.height}px`,
       zIndex: '2147483645',
-      pointerEvents: 'auto',
-      cursor: 'pointer',
+      pointerEvents: 'none',
       background: 'transparent',
-    });
-
-    el.addEventListener('mouseenter', () => {
-      onHoverCallback?.(annotation, rect);
-    });
-
-    el.addEventListener('mouseleave', (e) => {
-      const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
-      if (related?.closest?.('#marginalia-host')) return;
-      onLeaveCallback?.();
     });
 
     document.body.appendChild(el);
@@ -58,6 +47,13 @@ function repositionHitTargets() {
   for (const entry of entries) {
     const rects = entry.range.getClientRects();
     const targets = entry.hitTargets;
+
+    // If rect count changed (text reflow), recreate hit targets
+    if (rects.length !== targets.length) {
+      for (const el of targets) el.remove();
+      entry.hitTargets = createHitTargets(entry.range, entry.annotation);
+      continue;
+    }
 
     for (let i = 0; i < targets.length && i < rects.length; i++) {
       const rect = rects[i];
@@ -79,6 +75,37 @@ function scheduleReposition() {
   });
 }
 
+// Hover detection via mousemove — avoids pointer-events blocking on hit targets
+let currentHoverEntry: HighlightEntry | null = null;
+
+function findEntryAtPoint(x: number, y: number): HighlightEntry | null {
+  for (const entry of entries) {
+    const rects = entry.range.getClientRects();
+    for (const rect of rects) {
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return entry;
+      }
+    }
+  }
+  return null;
+}
+
+function handleMouseMove(e: MouseEvent) {
+  if (!visible) return;
+  const entry = findEntryAtPoint(e.clientX, e.clientY);
+
+  if (entry && entry !== currentHoverEntry) {
+    currentHoverEntry = entry;
+    const rect = entry.range.getClientRects()[0];
+    if (rect) {
+      onHoverCallback?.(entry.annotation, rect);
+    }
+  } else if (!entry && currentHoverEntry) {
+    currentHoverEntry = null;
+    onLeaveCallback?.();
+  }
+}
+
 export const highlightManager = {
   init(
     onHover: (annotation: Annotation, rect: DOMRect) => void,
@@ -89,6 +116,7 @@ export const highlightManager = {
 
     window.addEventListener('scroll', scheduleReposition, { passive: true });
     window.addEventListener('resize', scheduleReposition, { passive: true });
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
   },
 
   addAnnotation(annotation: Annotation): boolean {
@@ -138,6 +166,7 @@ export const highlightManager = {
   clear() {
     CSS.highlights.delete(HIGHLIGHT_NAME);
     highlight = null;
+    currentHoverEntry = null;
 
     for (const entry of entries) {
       for (const el of entry.hitTargets) {
@@ -148,6 +177,7 @@ export const highlightManager = {
 
     window.removeEventListener('scroll', scheduleReposition);
     window.removeEventListener('resize', scheduleReposition);
+    document.removeEventListener('mousemove', handleMouseMove);
     if (repositionRAF !== null) {
       cancelAnimationFrame(repositionRAF);
       repositionRAF = null;
