@@ -188,6 +188,7 @@ function init() {
   highlightManager.init(
     // onHover
     (annotation, rect) => {
+      console.log('[Marginalia] onHover callback', { id: annotation.id, rect: rect.toJSON() });
       if (closeTimer) {
         clearTimeout(closeTimer);
         closeTimer = null;

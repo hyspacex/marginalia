@@ -16,7 +16,7 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
   const arrowRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [arrowPosition, setArrowPosition] = useState({ x: 0, y: 0, side: 'bottom' as string });
+  const [arrowStyle, setArrowStyle] = useState<Record<string, string>>({});
 
   const html = useMemo(() => {
     if (!annotation) return '';
@@ -25,55 +25,66 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
   }, [annotation?.content]);
 
   useEffect(() => {
-    if (!annotation || !triggerRect || !cardRef.current) {
+    if (!annotation || !triggerRect) {
       setVisible(false);
       return;
     }
 
-    // Create a virtual element for Floating UI from the DOMRect
-    const virtualEl = {
-      getBoundingClientRect: () => triggerRect,
-    };
-
-    computePosition(virtualEl, cardRef.current, {
-      placement: 'top',
-      middleware: [
-        offset(8),
-        flip({ fallbackPlacements: ['bottom', 'top'] }),
-        shift({ padding: 12 }),
-        arrow({ element: arrowRef.current! }),
-      ],
-    }).then(({ x, y, placement, middlewareData }) => {
-      setPosition({ x, y });
-
-      if (middlewareData.arrow) {
-        const side = placement.split('-')[0];
-        setArrowPosition({
-          x: middlewareData.arrow.x ?? 0,
-          y: middlewareData.arrow.y ?? 0,
-          side,
-        });
+    // Wait a frame for the card to be rendered with display:block
+    console.log('[Marginalia] HoverCard useEffect', { annotationId: annotation.id, triggerRect: triggerRect.toJSON() });
+    requestAnimationFrame(() => {
+      const card = cardRef.current;
+      const arrowEl = arrowRef.current;
+      if (!card) {
+        console.log('[Marginalia] HoverCard: cardRef is null!');
+        return;
       }
 
-      // Trigger visible on next frame for animation
-      requestAnimationFrame(() => setVisible(true));
+      const virtualEl = {
+        getBoundingClientRect: () => triggerRect,
+      };
+
+      computePosition(virtualEl, card, {
+        strategy: 'fixed',
+        placement: 'top',
+        middleware: [
+          offset(8),
+          flip({ fallbackPlacements: ['bottom'] }),
+          shift({ padding: 12 }),
+          ...(arrowEl ? [arrow({ element: arrowEl })] : []),
+        ],
+      }).then(({ x, y, placement, middlewareData }) => {
+        console.log('[Marginalia] computePosition result', { x, y, placement });
+        setPosition({ x, y });
+
+        if (middlewareData.arrow && arrowEl) {
+          const side = placement.split('-')[0];
+          const staticSide = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[side] || 'bottom';
+          setArrowStyle({
+            left: middlewareData.arrow.x != null ? `${middlewareData.arrow.x}px` : '',
+            top: middlewareData.arrow.y != null ? `${middlewareData.arrow.y}px` : '',
+            [staticSide]: '-4px',
+          });
+        }
+
+        setVisible(true);
+      });
     });
   }, [annotation, triggerRect]);
 
-  if (!annotation) return null;
-
-  const arrowSideMap: Record<string, Record<string, string>> = {
-    top: { bottom: '-4px', left: `${arrowPosition.x}px` },
-    bottom: { top: '-4px', left: `${arrowPosition.x}px` },
-    left: { right: '-4px', top: `${arrowPosition.y}px` },
-    right: { left: '-4px', top: `${arrowPosition.y}px` },
-  };
+  // Always render the card — use display to hide/show.
+  // This keeps the ref stable so computePosition can measure it.
+  const show = annotation !== null;
 
   return (
     <div
       ref={cardRef}
-      class={`marginalia-card ${visible ? 'visible' : ''}`}
-      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      class={`marginalia-card ${visible && show ? 'visible' : ''}`}
+      style={{
+        display: show ? 'block' : 'none',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
@@ -85,7 +96,7 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
       <div
         ref={arrowRef}
         class="marginalia-card-arrow"
-        style={arrowSideMap[arrowPosition.side] || {}}
+        style={arrowStyle}
       />
     </div>
   );

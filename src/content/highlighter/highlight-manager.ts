@@ -97,6 +97,7 @@ function handleMouseMove(e: MouseEvent) {
   if (entry && entry !== currentHoverEntry) {
     currentHoverEntry = entry;
     const rect = entry.range.getClientRects()[0];
+    console.log('[Marginalia] hover detected', { annotationId: entry.annotation.id, rect, entriesCount: entries.length });
     if (rect) {
       onHoverCallback?.(entry.annotation, rect);
     }
