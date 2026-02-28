@@ -1,5 +1,3 @@
-export type AnnotationMode = 'close-reading' | 'context' | 'devil-advocate';
-
 export interface ExtractedContent {
   title: string;
   content: string;
@@ -12,16 +10,13 @@ export interface ExtractedContent {
 
 export interface Annotation {
   id: string;
-  mode: AnnotationMode;
   content: string;
-  anchor?: string;
+  anchor: string;      // REQUIRED: exact quote from article
   timestamp: number;
 }
 
 export interface AnnotationRequest {
   pageContent: string;
-  selectedText?: string;
-  modes: AnnotationMode[];
   memoryContext: MemoryPromptFragment;
   url: string;
   title: string;
@@ -47,7 +42,6 @@ export interface ReaderProfile {
   expertise: Record<string, 'beginner' | 'intermediate' | 'advanced'>;
   interests: string[];
   annotationPreferences: {
-    defaultModes: AnnotationMode[];
     depth: 'brief' | 'detailed';
     tone: 'academic' | 'collegial' | 'casual';
   };
@@ -72,7 +66,6 @@ export interface SessionState {
   tabId: number;
   url: string;
   title: string;
-  modes: AnnotationMode[];
   annotations: Annotation[];
   interactions: UserInteraction[];
   startedAt: number;
@@ -102,8 +95,7 @@ export interface ProviderConfig {
 
 // Message protocol
 export type RequestMessage =
-  | { type: 'ANNOTATE_PAGE'; payload: { url: string; title: string; text: string; modes: AnnotationMode[] } }
-  | { type: 'ANNOTATE_SELECTION'; payload: { url: string; title: string; text: string; selectedText: string; modes: AnnotationMode[] } }
+  | { type: 'ANNOTATE_PAGE'; payload: { url: string; title: string; text: string } }
   | { type: 'SAVE_ANNOTATION'; payload: { annotation: Annotation } }
   | { type: 'RECORD_INTERACTION'; payload: { interaction: UserInteraction } }
   | { type: 'GET_SESSION'; payload: { tabId: number } }
@@ -118,7 +110,7 @@ export type ResponseMessage =
 
 // Port message types for streaming
 export type PortMessage =
-  | { type: 'START_ANNOTATE'; payload: { url: string; title: string; text: string; selectedText?: string; modes: AnnotationMode[] } }
+  | { type: 'START_ANNOTATE'; payload: { url: string; title: string; text: string } }
   | { type: 'ANNOTATION_CHUNK'; payload: { annotation: Annotation } }
   | { type: 'STREAM_DONE'; payload: { usage: TokenUsage } }
   | { type: 'STREAM_ERROR'; payload: { message: string; code: string } };

@@ -1,27 +1,17 @@
-import type { AnnotationMode, ModelOption } from './types';
+import type { ModelOption } from './types';
 
 export const EXTENSION_NAME = 'Marginalia';
 
-export const SIDEBAR_WIDTH = 380;
-
-export const DEFAULT_MODES: AnnotationMode[] = ['close-reading', 'context', 'devil-advocate'];
-
-export const MODE_LABELS: Record<AnnotationMode, string> = {
-  'close-reading': 'Close Reading',
-  'context': 'Context',
-  'devil-advocate': "Devil's Advocate",
+export const HIGHLIGHT_COLORS = {
+  background: 'rgba(255, 200, 80, 0.15)',
+  backgroundHover: 'rgba(255, 200, 80, 0.30)',
+  underline: 'rgba(180, 140, 50, 0.5)',
 };
 
-export const MODE_COLORS: Record<AnnotationMode, string> = {
-  'close-reading': '#6366f1',
-  'context': '#0891b2',
-  'devil-advocate': '#dc2626',
-};
-
-export const MODE_ICONS: Record<AnnotationMode, string> = {
-  'close-reading': '\u{1F4D6}',
-  'context': '\u{1F30D}',
-  'devil-advocate': '\u{1F525}',
+export const CARD_CONFIG = {
+  maxWidth: 360,
+  openDelay: 300,
+  closeDelay: 200,
 };
 
 export const ANTHROPIC_MODELS: ModelOption[] = [
@@ -47,7 +37,5 @@ export const DEFAULT_ANTHROPIC_CONFIG = {
 };
 
 export const MEMORY_TOKEN_BUDGET = 1000;
-
-export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-
+export const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 export const PORT_NAME = 'marginalia-stream';
