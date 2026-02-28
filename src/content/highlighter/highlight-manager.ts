@@ -175,9 +175,6 @@ export const highlightManager = {
     }
     entries = [];
 
-    window.removeEventListener('scroll', scheduleReposition);
-    window.removeEventListener('resize', scheduleReposition);
-    document.removeEventListener('mousemove', handleMouseMove);
     if (repositionRAF !== null) {
       cancelAnimationFrame(repositionRAF);
       repositionRAF = null;
