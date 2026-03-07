@@ -4,6 +4,7 @@ import type { Annotation, PortMessage, ContentMessage } from '@/shared/types';
 import { highlightManager } from './highlighter/highlight-manager';
 import { HoverCard } from './card/HoverCard';
 import { FloatingPill } from './pill/FloatingPill';
+import { SummaryCard } from './summary/SummaryCard';
 import { extractPageContent } from './extraction/readability';
 import inlineCSS from './styles/inline.css?raw';
 
@@ -19,6 +20,8 @@ interface UIState {
   highlightsVisible: boolean;
   hoverAnnotation: Annotation | null;
   hoverRect: DOMRect | null;
+  summaryText: string | null;
+  summaryLoading: boolean;
 }
 
 let state: UIState = {
@@ -27,6 +30,8 @@ let state: UIState = {
   highlightsVisible: true,
   hoverAnnotation: null,
   hoverRect: null,
+  summaryText: null,
+  summaryLoading: false,
 };
 
 let renderUI: (() => void) | null = null;
@@ -99,10 +104,25 @@ function injectHost() {
             }
           },
         }),
+        h(SummaryCard, {
+          summary: state.summaryText,
+          loading: state.summaryLoading,
+          onClose: () => {
+            setState({ summaryText: null, summaryLoading: false });
+          },
+        }),
       ),
       container,
     );
   };
+
+  document.addEventListener('click', (e) => {
+    if (!state.summaryText) return;
+    const host = document.getElementById(HOST_ID);
+    if (host && !host.contains(e.target as Node)) {
+      setState({ summaryText: null, summaryLoading: false });
+    }
+  });
 }
 
 // --- Annotation flow ---
@@ -120,6 +140,8 @@ function startAnnotating() {
     highlightsVisible: true,
     hoverAnnotation: null,
     hoverRect: null,
+    summaryText: null,
+    summaryLoading: true,
   });
 
   const port = chrome.runtime.connect({ name: PORT_NAME });
@@ -145,13 +167,16 @@ function startAnnotating() {
         }
         break;
       }
+      case 'PAGE_SUMMARY':
+        setState({ summaryText: msg.payload.summary, summaryLoading: false });
+        break;
       case 'STREAM_DONE':
         setState({ loading: false });
         annotating = false;
         port.disconnect();
         break;
       case 'STREAM_ERROR':
-        setState({ loading: false });
+        setState({ loading: false, summaryLoading: false });
         annotating = false;
         port.disconnect();
         break;
@@ -159,7 +184,7 @@ function startAnnotating() {
   });
 
   port.onDisconnect.addListener(() => {
-    setState({ loading: false });
+    setState({ loading: false, summaryLoading: false });
     annotating = false;
   });
 }

@@ -99,17 +99,27 @@ chrome.runtime.onConnect.addListener((port) => {
         title,
       };
 
-      const { usage } = await anthropicProvider.streamAnnotations(
+      // Fire annotations and summary in parallel
+      const annotationPromise = anthropicProvider.streamAnnotations(
         request,
         config,
         (annotation) => {
-          // Track annotation in session
           if (tabId) {
             sessionTracker.addAnnotation(tabId, annotation);
           }
           port.postMessage({ type: 'ANNOTATION_CHUNK', payload: { annotation } });
         },
       );
+
+      const summaryPromise = anthropicProvider.generatePageSummary(text, title, config)
+        .then((result) => {
+          port.postMessage({ type: 'PAGE_SUMMARY', payload: { summary: result.summary } });
+        })
+        .catch((err) => {
+          console.error('Marginalia: Summary generation failed:', err);
+        });
+
+      const [{ usage }] = await Promise.all([annotationPromise, summaryPromise]);
 
       // Store usage
       await usageTracker.recordUsage(usage.inputTokens, usage.outputTokens);

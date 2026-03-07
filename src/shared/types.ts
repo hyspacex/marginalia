@@ -115,5 +115,6 @@ export type ResponseMessage =
 export type PortMessage =
   | { type: 'START_ANNOTATE'; payload: { url: string; title: string; text: string } }
   | { type: 'ANNOTATION_CHUNK'; payload: { annotation: Annotation } }
+  | { type: 'PAGE_SUMMARY'; payload: { summary: string } }
   | { type: 'STREAM_DONE'; payload: { usage: TokenUsage } }
   | { type: 'STREAM_ERROR'; payload: { message: string; code: string } };
