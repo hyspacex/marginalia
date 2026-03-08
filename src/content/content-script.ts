@@ -22,6 +22,8 @@ interface UIState {
   hoverRect: DOMRect | null;
   summaryText: string | null;
   summaryLoading: boolean;
+  summaryPinned: boolean;
+  summaryHoverActive: boolean;
 }
 
 let state: UIState = {
@@ -32,14 +34,49 @@ let state: UIState = {
   hoverRect: null,
   summaryText: null,
   summaryLoading: false,
+  summaryPinned: false,
+  summaryHoverActive: false,
 };
 
 let renderUI: (() => void) | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
+let summaryCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
 function setState(partial: Partial<UIState>) {
   Object.assign(state, partial);
   renderUI?.();
+}
+
+function cancelSummaryClose() {
+  if (summaryCloseTimer) {
+    clearTimeout(summaryCloseTimer);
+    summaryCloseTimer = null;
+  }
+}
+
+function hasSummaryContent() {
+  return state.summaryLoading || state.summaryText !== null;
+}
+
+function showSummary() {
+  if (!hasSummaryContent()) return;
+  cancelSummaryClose();
+  setState({ summaryHoverActive: true });
+}
+
+function scheduleSummaryClose() {
+  cancelSummaryClose();
+  if (state.summaryPinned) return;
+
+  summaryCloseTimer = setTimeout(() => {
+    setState({ summaryHoverActive: false });
+    summaryCloseTimer = null;
+  }, CARD_CONFIG.closeDelay);
+}
+
+function hideSummary() {
+  cancelSummaryClose();
+  setState({ summaryPinned: false, summaryHoverActive: false });
 }
 
 // --- Inject highlight styles into page <head> ---
@@ -95,6 +132,8 @@ function injectHost() {
           count: state.annotations.length,
           loading: state.loading,
           visible: state.highlightsVisible,
+          onMouseEnter: showSummary,
+          onMouseLeave: scheduleSummaryClose,
           onToggle: () => {
             const next = !state.highlightsVisible;
             highlightManager.setVisible(next);
@@ -107,8 +146,11 @@ function injectHost() {
         h(SummaryCard, {
           summary: state.summaryText,
           loading: state.summaryLoading,
+          visible: hasSummaryContent() && (state.summaryPinned || state.summaryHoverActive),
+          onMouseEnter: showSummary,
+          onMouseLeave: scheduleSummaryClose,
           onClose: () => {
-            setState({ summaryText: null, summaryLoading: false });
+            hideSummary();
           },
         }),
       ),
@@ -117,10 +159,10 @@ function injectHost() {
   };
 
   document.addEventListener('click', (e) => {
-    if (!state.summaryText) return;
+    if (!hasSummaryContent() || (!state.summaryPinned && !state.summaryHoverActive)) return;
     const host = document.getElementById(HOST_ID);
     if (host && !host.contains(e.target as Node)) {
-      setState({ summaryText: null, summaryLoading: false });
+      hideSummary();
     }
   });
 }
@@ -133,6 +175,7 @@ function startAnnotating() {
   if (!content) return;
 
   annotating = true;
+  cancelSummaryClose();
   highlightManager.clear();
   setState({
     annotations: [],
@@ -142,6 +185,8 @@ function startAnnotating() {
     hoverRect: null,
     summaryText: null,
     summaryLoading: true,
+    summaryPinned: true,
+    summaryHoverActive: false,
   });
 
   const port = chrome.runtime.connect({ name: PORT_NAME });
@@ -168,7 +213,12 @@ function startAnnotating() {
         break;
       }
       case 'PAGE_SUMMARY':
-        setState({ summaryText: msg.payload.summary, summaryLoading: false });
+        setState({
+          summaryText: msg.payload.summary,
+          summaryLoading: false,
+          summaryPinned: true,
+          summaryHoverActive: false,
+        });
         break;
       case 'STREAM_DONE':
         setState({ loading: false });
@@ -176,6 +226,7 @@ function startAnnotating() {
         port.disconnect();
         break;
       case 'STREAM_ERROR':
+        hideSummary();
         setState({ loading: false, summaryLoading: false });
         annotating = false;
         port.disconnect();
@@ -184,6 +235,7 @@ function startAnnotating() {
   });
 
   port.onDisconnect.addListener(() => {
+    cancelSummaryClose();
     setState({ loading: false, summaryLoading: false });
     annotating = false;
   });

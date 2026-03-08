@@ -1,14 +1,28 @@
 interface SummaryCardProps {
   summary: string | null;
   loading: boolean;
+  visible: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
   onClose: () => void;
 }
 
-export function SummaryCard({ summary, loading, onClose }: SummaryCardProps) {
-  if (!loading && !summary) return null;
+export function SummaryCard({
+  summary,
+  loading,
+  visible,
+  onMouseEnter,
+  onMouseLeave,
+  onClose,
+}: SummaryCardProps) {
+  if ((!loading && !summary) || !visible) return null;
 
   return (
-    <div class="marginalia-summary">
+    <div
+      class="marginalia-summary"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <button
         class="marginalia-summary-close"
         onClick={onClose}

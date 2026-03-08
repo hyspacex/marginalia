@@ -2,10 +2,19 @@ interface FloatingPillProps {
   count: number;
   loading: boolean;
   visible: boolean;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
   onToggle: () => void;
 }
 
-export function FloatingPill({ count, loading, visible, onToggle }: FloatingPillProps) {
+export function FloatingPill({
+  count,
+  loading,
+  visible,
+  onMouseEnter,
+  onMouseLeave,
+  onToggle,
+}: FloatingPillProps) {
   if (count === 0 && !loading) return null;
 
   const label = loading
@@ -17,6 +26,8 @@ export function FloatingPill({ count, loading, visible, onToggle }: FloatingPill
   return (
     <div
       class={`marginalia-pill ${loading ? 'loading' : ''} ${!visible && !loading ? 'hidden-state' : ''}`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       onClick={onToggle}
       title={visible ? 'Hide annotations' : 'Show annotations'}
     >
