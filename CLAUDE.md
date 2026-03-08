@@ -6,14 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `npm run build` — TypeScript check + Vite production build to `dist/`
 - `npm run dev` — Vite dev server with HMR (uses @crxjs/vite-plugin beta)
-- No test runner configured
+- `npm run test` — Run tests with Vitest
+- `npm run test:coverage` — Run tests with V8 coverage
 - No linter configured
 
 Load the extension in Chrome via `chrome://extensions` → Load unpacked → select `dist/`.
 
 ## Architecture
 
-Chrome extension (Manifest V3) — AI reading companion that generates contextual inline annotations and a page summary via the Claude API. Annotations appear as text highlights with hover cards; the summary appears in a floating card above a bottom-right pill.
+Chrome extension (Manifest V3) — AI reading companion that generates contextual inline annotations and a page summary via LLM APIs (Anthropic Claude or OpenAI). Annotations appear as text highlights with hover cards; the summary appears in a floating card above a bottom-right pill.
 
 ### Entry Points
 
@@ -45,11 +46,17 @@ State is managed via a plain `UIState` object + `setState()` pattern (no state l
 
 ### LLM Integration (`src/background/llm/`)
 
-Raw `fetch()` to Anthropic Messages API (no SDK — MV3 service workers can't use it). SSE streaming with JSONL output: each line is one `Annotation` object. Header `anthropic-dangerous-direct-browser-access: true` is required.
+Multi-provider architecture using raw `fetch()` (no SDK — MV3 service workers can't use it). SSE streaming with JSONL output: each line is one `Annotation` object.
 
-- `anthropic.ts` — SSE parser that buffers incomplete JSONL lines at chunk boundaries
-- `prompt-builder.ts` — assembles system prompt from `src/prompts/*.txt` templates + memory context
-- `provider.ts` — `LLMProvider` interface (methods: `streamAnnotations`, `generateAnnotations`, `updateReaderProfile`, `generatePageSummary`, `testConnection`)
+- `provider.ts` — `ProviderTransport` interface (`generateText`, `streamText`) abstraction over LLM APIs
+- `provider-registry.ts` — registers Anthropic and OpenAI providers with available models
+- `providers/anthropic.ts` — Anthropic Messages API transport (requires `anthropic-dangerous-direct-browser-access: true` header)
+- `providers/openai.ts` — OpenAI Responses API transport
+- `provider-storage.ts` — persists active provider, API keys, base URLs, and model selection in `chrome.storage.local`
+- `flows.ts` — high-level LLM service orchestrating `streamAnnotations`, `generatePageSummary`, `updateReaderProfile`, `testConnection`
+- `prompt-builder.ts` — assembles system prompts from `src/prompts/*.txt` templates + memory context (`buildAnnotationPrompt`, `buildProfileUpdatePrompt`, `buildSummaryPrompt`)
+- `response-parsers.ts` — JSONL annotation parsing and `PageSummary` extraction
+- `sse.ts` — generic SSE stream parser shared by both providers
 
 ### Session Lifecycle
 
