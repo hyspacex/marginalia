@@ -1,12 +1,14 @@
-import type { Annotation, SessionState, UserInteraction } from '@/shared/types';
+import type { Annotation, PageSummary, SessionState, UserInteraction } from '@/shared/types';
 import { SESSION_IDLE_TIMEOUT_MS } from '@/shared/constants';
 
 const sessions = new Map<number, SessionState>();
 
 export const sessionTracker = {
-  startSession(tabId: number, url: string, title: string) {
+  startSession(tabId: number, url: string, title: string, pageContent: string) {
     const existing = sessions.get(tabId);
     if (existing && existing.url === url) {
+      existing.title = title;
+      existing.pageContent = pageContent;
       existing.lastActiveAt = Date.now();
       return;
     }
@@ -15,6 +17,8 @@ export const sessionTracker = {
       tabId,
       url,
       title,
+      pageContent,
+      pageSummary: null,
       annotations: [],
       interactions: [],
       startedAt: Date.now(),
@@ -31,6 +35,13 @@ export const sessionTracker = {
     if (session) {
       session.annotations.push(annotation);
       session.lastActiveAt = Date.now();
+    }
+  },
+
+  setPageSummary(tabId: number, pageSummary: PageSummary) {
+    const session = sessions.get(tabId);
+    if (session) {
+      session.pageSummary = pageSummary;
     }
   },
 

@@ -90,7 +90,7 @@ function copyExtensionFiles(): Plugin {
         name: 'Marginalia',
         description: 'AI-powered reading companion — contextual annotations for any web page',
         version: '0.1.0',
-        permissions: ['activeTab', 'storage', 'tabs'],
+        permissions: ['activeTab', 'alarms', 'storage', 'tabs'],
         action: {
           default_popup: 'popup.html',
           default_icon: {

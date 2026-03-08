@@ -1,5 +1,5 @@
 import { PORT_NAME, DEFAULT_ANTHROPIC_CONFIG } from '@/shared/constants';
-import type { RequestMessage, ResponseMessage, PortMessage, ProviderConfig, AnnotationRequest, MemoryPromptFragment } from '@/shared/types';
+import type { AnnotationRequest, PortMessage, ProviderConfig, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
 import { anthropicProvider } from './llm/anthropic';
 import { sessionTracker } from './memory/session-tracker';
 import { getMemoryContext } from './memory/memory-retriever';
@@ -9,6 +9,9 @@ import { usageTracker } from './usage-tracker';
 
 console.log('Marginalia service worker started');
 
+const SESSION_IDLE_ALARM = 'marginalia-session-idle-check';
+const SESSION_IDLE_CHECK_PERIOD_MINUTES = 5;
+
 async function getProviderConfig(): Promise<ProviderConfig> {
   const result = await chrome.storage.local.get(['apiKey', 'model', 'baseUrl']);
   return {
@@ -17,6 +20,32 @@ async function getProviderConfig(): Promise<ProviderConfig> {
     baseUrl: result.baseUrl || DEFAULT_ANTHROPIC_CONFIG.baseUrl,
   };
 }
+
+function normalizeSessionUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function shouldFinalizeForUrlChange(currentUrl: string, nextUrl: string): boolean {
+  return normalizeSessionUrl(currentUrl) !== normalizeSessionUrl(nextUrl);
+}
+
+function ensureSessionIdleAlarm() {
+  chrome.alarms.create(SESSION_IDLE_ALARM, {
+    periodInMinutes: SESSION_IDLE_CHECK_PERIOD_MINUTES,
+  });
+}
+
+ensureSessionIdleAlarm();
+
+chrome.runtime.onInstalled.addListener(() => {
+  ensureSessionIdleAlarm();
+});
 
 // Handle one-shot messages
 chrome.runtime.onMessage.addListener((
@@ -86,7 +115,12 @@ chrome.runtime.onConnect.addListener((port) => {
       // Track session
       const tabId = port.sender?.tab?.id;
       if (tabId) {
-        sessionTracker.startSession(tabId, url, title);
+        const existingSession = sessionTracker.getSession(tabId);
+        if (existingSession && shouldFinalizeForUrlChange(existingSession.url, url)) {
+          void persistSession(sessionTracker.endSession(tabId));
+        }
+
+        sessionTracker.startSession(tabId, url, title, text);
       }
 
       // Get memory context
@@ -113,6 +147,9 @@ chrome.runtime.onConnect.addListener((port) => {
 
       const summaryPromise = anthropicProvider.generatePageSummary(text, title, config)
         .then((result) => {
+          if (tabId) {
+            sessionTracker.setPageSummary(tabId, result);
+          }
           port.postMessage({ type: 'PAGE_SUMMARY', payload: { summary: result.summary } });
         })
         .catch((err) => {
@@ -135,6 +172,26 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== SESSION_IDLE_ALARM) return;
+
+  void Promise.all(
+    sessionTracker
+      .getAllSessions()
+      .filter((session) => sessionTracker.isIdle(session.tabId))
+      .map((session) => endSession(session.tabId))
+  );
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (!changeInfo.url) return;
+
+  const session = sessionTracker.getSession(tabId);
+  if (session && shouldFinalizeForUrlChange(session.url, changeInfo.url)) {
+    void endSession(tabId);
+  }
+});
+
 // Track tab closures for session endings
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   const session = sessionTracker.getSession(tabId);
@@ -145,6 +202,10 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 
 async function endSession(tabId: number) {
   const session = sessionTracker.endSession(tabId);
+  await persistSession(session);
+}
+
+async function persistSession(session: SessionState | undefined) {
   if (!session || session.annotations.length === 0) return;
 
   try {
@@ -160,8 +221,8 @@ async function endSession(tabId: number) {
 
     // Generate page summary and store in reading graph
     try {
-      const pageText = session.annotations.map((a) => a.content).join(' ');
-      const summary = await anthropicProvider.generatePageSummary(pageText, session.title, config);
+      const summary = session.pageSummary ??
+        await anthropicProvider.generatePageSummary(session.pageContent, session.title, config);
 
       await readingGraph.addEntry({
         url: session.url,
@@ -183,4 +244,3 @@ async function endSession(tabId: number) {
     console.error('Marginalia: Error ending session:', err);
   }
 }
-

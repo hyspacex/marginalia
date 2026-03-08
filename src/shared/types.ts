@@ -62,10 +62,18 @@ export interface ReadingGraphEntry {
   savedAnnotations: Annotation[];
 }
 
+export interface PageSummary {
+  summary: string;
+  keyClaims: string[];
+  topics: string[];
+}
+
 export interface SessionState {
   tabId: number;
   url: string;
   title: string;
+  pageContent: string;
+  pageSummary: PageSummary | null;
   annotations: Annotation[];
   interactions: UserInteraction[];
   startedAt: number;
