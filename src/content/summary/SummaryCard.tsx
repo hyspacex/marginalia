@@ -1,3 +1,5 @@
+import { renderMarkdownToHtml } from '../render/markdown';
+
 interface SummaryCardProps {
   summary: string | null;
   loading: boolean;
@@ -16,6 +18,8 @@ export function SummaryCard({
   onClose,
 }: SummaryCardProps) {
   if ((!loading && !summary) || !visible) return null;
+
+  const html = summary ? renderMarkdownToHtml(summary) : '';
 
   return (
     <div
@@ -38,7 +42,10 @@ export function SummaryCard({
           <div class="marginalia-skeleton-line short" />
         </div>
       ) : (
-        <p class="marginalia-summary-text">{summary}</p>
+        <div
+          class="marginalia-summary-text"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       )}
     </div>
   );

@@ -91,14 +91,34 @@ export interface ModelOption {
   id: string;
   name: string;
   contextWindow: number;
-  costPer1kInput: number;
-  costPer1kOutput: number;
+  costPer1kInput: number | null;
+  costPer1kOutput: number | null;
 }
 
-export interface ProviderConfig {
+export type ProviderId = 'anthropic' | 'openai';
+
+export type ProviderModelMode = 'catalog' | 'custom';
+
+export interface StoredProviderConfig {
   apiKey: string;
-  model: string;
   baseUrl: string;
+  modelMode: ProviderModelMode;
+  modelId: string;
+  options: Record<string, string>;
+}
+
+export interface ProviderConfigInput extends StoredProviderConfig {
+  providerId: ProviderId;
+}
+
+export interface StoredProvidersState {
+  version: number;
+  activeProviderId: ProviderId;
+  configsByProvider: Partial<Record<ProviderId, StoredProviderConfig>>;
+}
+
+export interface ProviderConfig extends ProviderConfigInput {
+  resolvedModel: string;
 }
 
 // Message protocol — service worker messages
@@ -107,7 +127,7 @@ export type RequestMessage =
   | { type: 'RECORD_INTERACTION'; payload: { interaction: UserInteraction } }
   | { type: 'GET_SESSION'; payload: { tabId: number } }
   | { type: 'END_SESSION'; payload: { tabId: number } }
-  | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfig } };
+  | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfigInput } };
 
 // Message protocol — content script messages (popup → content script)
 export type ContentMessage =

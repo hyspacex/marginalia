@@ -202,6 +202,33 @@
 
 .marginalia-summary-text {
   margin: 0;
+  line-height: 1.5;
+}
+
+.marginalia-summary-text p,
+.marginalia-summary-text ul,
+.marginalia-summary-text ol {
+  margin: 0 0 10px;
+}
+
+.marginalia-summary-text p:last-child,
+.marginalia-summary-text ul:last-child,
+.marginalia-summary-text ol:last-child {
+  margin-bottom: 0;
+}
+
+.marginalia-summary-text ul,
+.marginalia-summary-text ol {
+  padding-left: 18px;
+}
+
+.marginalia-summary-text li + li {
+  margin-top: 6px;
+}
+
+.marginalia-summary-text strong {
+  font-weight: 600;
+  color: #0f172a;
 }
 
 /* Skeleton loading */

@@ -1,40 +1,80 @@
 import type {
-  AnnotationRequest,
-  AnnotationResponse,
-  Annotation,
   ModelOption,
   ProviderConfig,
-  ReaderProfile,
-  SessionState,
+  ProviderId,
+  StoredProviderConfig,
+  TokenUsage,
 } from '@/shared/types';
 
-export interface LLMProvider {
-  id: string;
+export type ProviderErrorCode =
+  | 'auth'
+  | 'rate_limit'
+  | 'network'
+  | 'protocol'
+  | 'unsupported_model'
+  | 'unknown';
+
+export class ProviderError extends Error {
+  code: ProviderErrorCode;
+  providerId: ProviderId;
+  status?: number;
+
+  constructor(providerId: ProviderId, code: ProviderErrorCode, message: string, status?: number) {
+    super(message);
+    this.name = 'ProviderError';
+    this.code = code;
+    this.providerId = providerId;
+    this.status = status;
+  }
+}
+
+export interface ProviderField {
+  key: string;
+  label: string;
+  type: 'password' | 'text' | 'url';
+  target: 'apiKey' | 'baseUrl' | 'option';
+  placeholder?: string;
+  helpText?: string;
+  required?: boolean;
+}
+
+export interface ProviderTransportDeps {
+  fetch: typeof fetch;
+}
+
+export interface TextRequest {
+  config: ProviderConfig;
+  systemPrompt: string;
+  userPrompt: string;
+  maxOutputTokens: number;
+}
+
+export interface TextResult {
+  text: string;
+  usage: TokenUsage;
+}
+
+export interface StreamTextResult {
+  usage: TokenUsage;
+}
+
+export interface ProviderTransport {
+  generateText(request: TextRequest): Promise<TextResult>;
+  streamText(
+    request: TextRequest,
+    onTextDelta: (delta: string) => void,
+  ): Promise<StreamTextResult>;
+  testConnection(config: ProviderConfig): Promise<void>;
+}
+
+export interface ProviderDescriptor {
+  id: ProviderId;
   name: string;
-  models: ModelOption[];
-
-  generateAnnotations(
-    request: AnnotationRequest,
-    config: ProviderConfig,
-  ): Promise<AnnotationResponse>;
-
-  streamAnnotations(
-    request: AnnotationRequest,
-    config: ProviderConfig,
-    onAnnotation: (annotation: Annotation) => void,
-  ): Promise<{ usage: { inputTokens: number; outputTokens: number } }>;
-
-  updateReaderProfile(
-    current: ReaderProfile,
-    session: SessionState,
-    config: ProviderConfig,
-  ): Promise<ReaderProfile>;
-
-  generatePageSummary(
-    text: string,
-    title: string,
-    config: ProviderConfig,
-  ): Promise<{ summary: string; keyClaims: string[]; topics: string[] }>;
-
-  testConnection(config: ProviderConfig): Promise<boolean>;
+  description: string;
+  models: readonly ModelOption[];
+  fields: readonly ProviderField[];
+  normalizeConfig(config?: Partial<StoredProviderConfig>): StoredProviderConfig;
+  resolveConfig(config?: Partial<StoredProviderConfig>): ProviderConfig;
+  estimateCost(config: ProviderConfig, inputTokens: number, outputTokens: number): number | null;
+  createTransport(deps?: Partial<ProviderTransportDeps>): ProviderTransport;
 }

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import type { Annotation } from '@/shared/types';
+import { renderMarkdownToHtml } from '../render/markdown';
 
 interface HoverCardProps {
   annotation: Annotation | null;
@@ -20,8 +19,7 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
 
   const html = useMemo(() => {
     if (!annotation) return '';
-    const raw = marked.parse(annotation.content, { async: false }) as string;
-    return DOMPurify.sanitize(raw);
+    return renderMarkdownToHtml(annotation.content);
   }, [annotation?.content]);
 
   useEffect(() => {

@@ -51,10 +51,12 @@ export function buildSummaryPrompt(
   text: string,
   title: string,
 ): { system: string; user: string } {
-  const system = `Summarize the following page for a reading graph. Output a JSON object with:
-- summary: 2-3 sentence summary
+  const system = `Summarize the following page for a reading graph. Focus on the key takeaways a reader should retain after a one-minute read. Output a JSON object with:
+- summary: a concise summary string formatted as 3-5 markdown bullet points, each on its own line starting with "- ", highlighting the most important takeaways, findings, or arguments
 - keyClaims: array of 2-5 key claims or arguments
 - topics: array of 3-7 topic tags (lowercase, hyphenated)
+
+Keep the bullets crisp and information-dense. Avoid preambles, conclusions, or prose paragraphs.
 
 Output only the JSON object, nothing else.`;
 

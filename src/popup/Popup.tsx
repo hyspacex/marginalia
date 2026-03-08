@@ -1,15 +1,34 @@
 import { render } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import { getProviderDescriptor } from '@/background/llm/provider-registry';
+import { getProvidersState, hasProviderCredentials, resolveProviderConfig } from '@/background/llm/provider-storage';
+import { usageTracker } from '@/background/usage-tracker';
 
-function Popup() {
+export function Popup() {
   const [totalTokens, setTotalTokens] = useState(0);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [providerName, setProviderName] = useState('provider');
 
   useEffect(() => {
-    chrome.storage.local.get(['apiKey', 'totalInputTokens', 'totalOutputTokens'], (result) => {
-      setHasApiKey(!!result.apiKey);
-      setTotalTokens((result.totalInputTokens || 0) + (result.totalOutputTokens || 0));
-    });
+    let cancelled = false;
+
+    (async () => {
+      const [providersState, usageTotals] = await Promise.all([
+        getProvidersState(),
+        usageTracker.getTotals(),
+      ]);
+
+      if (cancelled) return;
+
+      const activeConfig = resolveProviderConfig(providersState);
+      setHasApiKey(hasProviderCredentials(activeConfig));
+      setProviderName(getProviderDescriptor(activeConfig.providerId).name);
+      setTotalTokens(usageTotals.inputTokens + usageTotals.outputTokens);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleAnnotate = () => {
@@ -31,7 +50,7 @@ function Popup() {
 
       {!hasApiKey && (
         <div class="popup-warning">
-          No API key set.{' '}
+          No {providerName} API key set.{' '}
           <a href="#" onClick={openOptions}>Configure in settings</a>
         </div>
       )}
@@ -51,4 +70,7 @@ function Popup() {
   );
 }
 
-render(<Popup />, document.getElementById('popup-root')!);
+const popupRoot = document.getElementById('popup-root');
+if (popupRoot) {
+  render(<Popup />, popupRoot);
+}

@@ -32,6 +32,27 @@ body {
   font-weight: 600;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-copy,
+.provider-description,
+.field-help,
+.status-message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.provider-description {
+  margin-bottom: 16px;
+}
+
 .options-label {
   display: block;
   margin-bottom: 12px;
@@ -64,6 +85,21 @@ body {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+}
+
+.model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.model-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
 }
 
 .btn-primary {
@@ -170,4 +206,40 @@ body {
   font-size: 11px;
   color: #94a3b8;
   margin-top: 8px;
+}
+
+.field-help {
+  display: block;
+  margin-top: 6px;
+}
+
+.status-message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.status-success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+@media (max-width: 720px) {
+  .options {
+    padding: 20px 16px;
+  }
+
+  .stats-grid,
+  .model-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .options-actions {
+    flex-direction: column;
+  }
 }
