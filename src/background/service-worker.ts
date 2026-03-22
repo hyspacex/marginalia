@@ -1,6 +1,7 @@
 import { PORT_NAME } from '@/shared/constants';
 import type { AnnotationRequest, ContentMessage, PortMessage, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
 import { createLlmService } from './llm/flows';
+import { estimateProviderCost, saveProviderModelCatalog } from './llm/provider-model-catalog';
 import { getProviderDescriptor } from './llm/provider-registry';
 import { getProvidersState, hasProviderCredentials, resolveProviderConfig } from './llm/provider-storage';
 import { sessionTracker } from './memory/session-tracker';
@@ -88,6 +89,16 @@ function registerListeners() {
             sendResponse({
               type: 'ANNOTATIONS_READY',
               payload: { annotations: [], usage: { inputTokens: 0, outputTokens: 0 } },
+            });
+            break;
+          }
+
+          case 'LIST_MODELS': {
+            const models = await llmService.listModels(message.payload.config);
+            const normalizedModels = await saveProviderModelCatalog(message.payload.config.providerId, models);
+            sendResponse({
+              type: 'MODEL_CATALOG',
+              payload: { models: normalizedModels },
             });
             break;
           }
@@ -194,7 +205,7 @@ function registerListeners() {
           modelId: config.resolvedModel,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
-          estimatedCost: descriptor.estimateCost(config, usage.inputTokens, usage.outputTokens),
+          estimatedCost: await estimateProviderCost(config, usage.inputTokens, usage.outputTokens),
         });
 
         port.postMessage({ type: 'STREAM_DONE', payload: { usage } });

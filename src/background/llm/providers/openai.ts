@@ -1,4 +1,4 @@
-import type { ProviderConfig, TokenUsage } from '@/shared/types';
+import type { ModelOption, ProviderConfig, TokenUsage } from '@/shared/types';
 import { consumeSseStream } from '../sse';
 import {
   ProviderError,
@@ -53,6 +53,50 @@ function mapError(status: number, message: string): ProviderError {
   return new ProviderError('openai', 'unknown', message, status);
 }
 
+function normalizeModelCatalogEntry(entry: any): ModelOption | null {
+  const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+  if (!id || !isLikelyResponsesModel(id)) return null;
+
+  return {
+    id,
+    name: id,
+    contextWindow: null,
+    costPer1kInput: null,
+    costPer1kOutput: null,
+  };
+}
+
+function isLikelyResponsesModel(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  if (!lower) return false;
+
+  const excludedPrefixes = [
+    'babbage',
+    'computer-use',
+    'dall',
+    'davinci',
+    'gpt-audio',
+    'gpt-image',
+    'gpt-realtime',
+    'omni-moderation',
+    'sora',
+    'text-embedding',
+    'text-moderation',
+    'text-search',
+    'tts',
+    'whisper',
+  ];
+
+  if (excludedPrefixes.some((prefix) => lower.startsWith(prefix))) {
+    return false;
+  }
+
+  return lower.startsWith('gpt')
+    || lower.startsWith('o')
+    || lower.startsWith('chatgpt')
+    || lower.startsWith('codex');
+}
+
 async function openAiFetch(
   fetchImpl: typeof fetch,
   config: ProviderConfig,
@@ -68,6 +112,29 @@ async function openAiFetch(
         Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new ProviderError('openai', 'network', String(error));
+  }
+
+  if (!response.ok) {
+    const bodyText = await response.text();
+    throw mapError(response.status, parseErrorMessage(bodyText, `OpenAI API error: ${response.status}`));
+  }
+
+  return response;
+}
+
+async function openAiGet(fetchImpl: typeof fetch, config: ProviderConfig, path: string): Promise<Response> {
+  let response: Response;
+
+  try {
+    response = await fetchImpl(`${config.baseUrl}${path}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
     });
   } catch (error) {
     throw new ProviderError('openai', 'network', String(error));
@@ -146,6 +213,20 @@ export function createOpenAiTransport(
       });
 
       return { usage };
+    },
+
+    async listModels(config: ProviderConfig) {
+      const response = await openAiGet(fetchImpl, config, '/v1/models');
+      const data = await response.json();
+
+      if (!Array.isArray(data?.data)) {
+        throw new ProviderError('openai', 'protocol', 'OpenAI model list did not match the expected shape');
+      }
+
+      return data.data
+        .map(normalizeModelCatalogEntry)
+        .filter((model: ModelOption | null): model is ModelOption => model != null)
+        .sort((left: ModelOption, right: ModelOption) => left.name.localeCompare(right.name));
     },
 
     async testConnection(config: ProviderConfig) {

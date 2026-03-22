@@ -1,6 +1,7 @@
 import type {
   Annotation,
   AnnotationRequest,
+  ModelOption,
   PageSummary,
   ProviderConfig,
   ProviderConfigInput,
@@ -147,6 +148,17 @@ export function createLlmService(deps: LlmServiceDeps = {}) {
 
       try {
         await transport.testConnection(config);
+      } catch (error) {
+        throw toProviderError(error, config);
+      }
+    },
+
+    async listModels(configInput: ProviderConfigInput | ProviderConfig): Promise<ModelOption[]> {
+      const { config, transport } = resolve(configInput);
+      ensureConfigured(config);
+
+      try {
+        return await transport.listModels(config);
       } catch (error) {
         throw toProviderError(error, config);
       }

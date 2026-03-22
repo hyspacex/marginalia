@@ -205,4 +205,24 @@ describe('createLlmService', () => {
       code: 'network',
     });
   });
+
+  test('lists provider models through the transport', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => createJsonResponse({
+      data: [
+        { id: 'gpt-5.4-2026-03-05' },
+        { id: 'gpt-image-1' },
+      ],
+    }));
+    const service = createLlmService({ fetch: fetchMock });
+
+    await expect(service.listModels(openAiConfig)).resolves.toEqual([
+      {
+        id: 'gpt-5.4-2026-03-05',
+        name: 'gpt-5.4-2026-03-05',
+        contextWindow: null,
+        costPer1kInput: null,
+        costPer1kOutput: null,
+      },
+    ]);
+  });
 });

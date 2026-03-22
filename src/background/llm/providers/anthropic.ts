@@ -1,4 +1,4 @@
-import type { ProviderConfig, TokenUsage } from '@/shared/types';
+import type { ModelOption, ProviderConfig, TokenUsage } from '@/shared/types';
 import { consumeSseStream } from '../sse';
 import {
   ProviderError,
@@ -61,6 +61,23 @@ function mapError(status: number, message: string): ProviderError {
   return new ProviderError('anthropic', 'unknown', message, status);
 }
 
+function normalizeModelCatalogEntry(entry: any): ModelOption | null {
+  const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
+  if (!id) return null;
+
+  const name = typeof entry?.display_name === 'string' && entry.display_name.trim()
+    ? entry.display_name.trim()
+    : id;
+
+  return {
+    id,
+    name,
+    contextWindow: null,
+    costPer1kInput: null,
+    costPer1kOutput: null,
+  };
+}
+
 async function anthropicFetch(
   fetchImpl: typeof fetch,
   config: ProviderConfig,
@@ -78,6 +95,31 @@ async function anthropicFetch(
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new ProviderError('anthropic', 'network', String(error));
+  }
+
+  if (!response.ok) {
+    const bodyText = await response.text();
+    throw mapError(response.status, parseErrorMessage(bodyText, `Anthropic API error: ${response.status}`));
+  }
+
+  return response;
+}
+
+async function anthropicGet(fetchImpl: typeof fetch, config: ProviderConfig, path: string): Promise<Response> {
+  let response: Response;
+
+  try {
+    response = await fetchImpl(`${config.baseUrl}${path}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
     });
   } catch (error) {
     throw new ProviderError('anthropic', 'network', String(error));
@@ -156,6 +198,20 @@ export function createAnthropicTransport(
       });
 
       return { usage };
+    },
+
+    async listModels(config: ProviderConfig) {
+      const response = await anthropicGet(fetchImpl, config, '/v1/models');
+      const data = await response.json();
+
+      if (!Array.isArray(data?.data)) {
+        throw new ProviderError('anthropic', 'protocol', 'Anthropic model list did not match the expected shape');
+      }
+
+      return data.data
+        .map(normalizeModelCatalogEntry)
+        .filter((model: ModelOption | null): model is ModelOption => model != null)
+        .sort((left: ModelOption, right: ModelOption) => left.name.localeCompare(right.name));
     },
 
     async testConnection(config: ProviderConfig) {

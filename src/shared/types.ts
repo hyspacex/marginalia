@@ -90,12 +90,12 @@ export interface UserInteraction {
 export interface ModelOption {
   id: string;
   name: string;
-  contextWindow: number;
+  contextWindow: number | null;
   costPer1kInput: number | null;
   costPer1kOutput: number | null;
 }
 
-export type ProviderId = 'anthropic' | 'openai';
+export type ProviderId = 'anthropic' | 'openai' | 'openrouter';
 
 export type ProviderModelMode = 'catalog' | 'custom';
 
@@ -127,6 +127,7 @@ export type RequestMessage =
   | { type: 'RECORD_INTERACTION'; payload: { interaction: UserInteraction } }
   | { type: 'GET_SESSION'; payload: { tabId: number } }
   | { type: 'END_SESSION'; payload: { tabId: number } }
+  | { type: 'LIST_MODELS'; payload: { config: ProviderConfigInput } }
   | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfigInput } };
 
 // Message protocol — content script messages (popup → content script)
@@ -135,6 +136,7 @@ export type ContentMessage =
 
 export type ResponseMessage =
   | { type: 'ANNOTATIONS_READY'; payload: { annotations: Annotation[]; usage: TokenUsage } }
+  | { type: 'MODEL_CATALOG'; payload: { models: ModelOption[] } }
   | { type: 'ANNOTATION_CHUNK'; payload: { annotation: Annotation } }
   | { type: 'STREAM_DONE'; payload: { usage: TokenUsage } }
   | { type: 'ERROR'; payload: { message: string; code: string } };

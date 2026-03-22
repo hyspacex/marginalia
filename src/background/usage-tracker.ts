@@ -1,4 +1,5 @@
 import type { ProviderId } from '@/shared/types';
+import { isProviderId } from './llm/provider-registry';
 
 export interface UsageRecord {
   date: string;
@@ -41,7 +42,8 @@ function coerceHistory(value: unknown): UsageRecord[] {
 
   return value.filter((entry): entry is UsageRecord => {
     return typeof entry?.date === 'string'
-      && (entry.providerId === 'anthropic' || entry.providerId === 'openai')
+      && typeof entry.providerId === 'string'
+      && isProviderId(entry.providerId)
       && typeof entry.modelId === 'string'
       && typeof entry.inputTokens === 'number'
       && typeof entry.outputTokens === 'number'

@@ -7,6 +7,7 @@ import type {
 import type { ProviderDescriptor } from './provider';
 import { createAnthropicTransport } from './providers/anthropic';
 import { createOpenAiTransport } from './providers/openai';
+import { createOpenRouterTransport } from './providers/openrouter';
 
 const DEFAULT_MODEL_MODE = 'catalog' as const;
 
@@ -48,6 +49,16 @@ const OPENAI_MODELS: readonly ModelOption[] = [
     contextWindow: 400000,
     costPer1kInput: 0.00025,
     costPer1kOutput: 0.002,
+  },
+];
+
+const OPENROUTER_MODELS: readonly ModelOption[] = [
+  {
+    id: 'openai/gpt-4.1-mini',
+    name: 'OpenAI GPT-4.1 mini',
+    contextWindow: null,
+    costPer1kInput: null,
+    costPer1kOutput: null,
   },
 ];
 
@@ -110,6 +121,48 @@ const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     ],
     createTransport: createOpenAiTransport,
   }),
+  openrouter: createProviderDescriptor({
+    id: 'openrouter',
+    name: 'OpenRouter',
+    description: 'Aggregated models via the OpenRouter Responses API.',
+    defaultBaseUrl: 'https://openrouter.ai/api',
+    defaultModelId: 'openai/gpt-4.1-mini',
+    models: OPENROUTER_MODELS,
+    fields: [
+      {
+        key: 'apiKey',
+        label: 'API Key',
+        type: 'password',
+        target: 'apiKey',
+        placeholder: 'sk-or-...',
+        required: true,
+      },
+      {
+        key: 'baseUrl',
+        label: 'Base URL',
+        type: 'url',
+        target: 'baseUrl',
+        placeholder: 'https://openrouter.ai/api',
+      },
+      {
+        key: 'appTitle',
+        label: 'App Title',
+        type: 'text',
+        target: 'option',
+        placeholder: 'Marginalia',
+        helpText: 'Optional. Sent as X-Title for OpenRouter attribution.',
+      },
+      {
+        key: 'httpReferer',
+        label: 'App URL',
+        type: 'url',
+        target: 'option',
+        placeholder: 'https://example.com',
+        helpText: 'Optional. Sent as HTTP-Referer for OpenRouter attribution.',
+      },
+    ],
+    createTransport: createOpenRouterTransport,
+  }),
 };
 
 function createProviderDescriptor(args: {
@@ -123,12 +176,11 @@ function createProviderDescriptor(args: {
   legacyModelIds?: Record<string, string>;
   createTransport: ProviderDescriptor['createTransport'];
 }): ProviderDescriptor {
-  const modelIds = new Set(args.models.map((model) => model.id));
-
   function normalizeModelId(rawModelId: string): string {
     const modelId = rawModelId.trim();
-    const mappedModelId = args.legacyModelIds?.[modelId] || modelId;
-    return modelIds.has(mappedModelId) ? mappedModelId : args.defaultModelId;
+    if (!modelId) return args.defaultModelId;
+
+    return args.legacyModelIds?.[modelId] || modelId;
   }
 
   function normalizeConfig(config: Partial<StoredProviderConfig> = {}): StoredProviderConfig {
@@ -210,7 +262,7 @@ export const providerDescriptors = Object.freeze(
 export const DEFAULT_PROVIDER_ID: ProviderId = 'anthropic';
 
 export function isProviderId(value: string): value is ProviderId {
-  return value === 'anthropic' || value === 'openai';
+  return value === 'anthropic' || value === 'openai' || value === 'openrouter';
 }
 
 export function getProviderDescriptor(providerId: ProviderId): ProviderDescriptor {

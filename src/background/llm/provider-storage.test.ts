@@ -104,6 +104,13 @@ describe('provider storage', () => {
           modelId: 'gpt-5.4-2026-03-05',
           options: {},
         },
+        openrouter: {
+          apiKey: '',
+          baseUrl: 'https://openrouter.ai/api',
+          modelMode: 'catalog',
+          modelId: 'openai/gpt-4.1-mini',
+          options: {},
+        },
       },
     });
   });

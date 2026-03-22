@@ -25,6 +25,13 @@ const mocked = vi.hoisted(() => {
         modelId: 'gpt-5.4-2026-03-05',
         options: {},
       },
+      openrouter: {
+        apiKey: 'openrouter-key',
+        baseUrl: 'https://openrouter.ai/api',
+        modelMode: 'catalog',
+        modelId: 'openai/gpt-4.1-mini',
+        options: {},
+      },
     },
   };
 
@@ -80,10 +87,29 @@ describe('Options', () => {
         },
       },
       runtime: {
-        sendMessage: vi.fn(async () => ({
-          type: 'ANNOTATIONS_READY',
-          payload: { annotations: [], usage: { inputTokens: 0, outputTokens: 0 } },
-        })),
+        sendMessage: vi.fn(async (message: { type: string }) => {
+          if (message.type === 'LIST_MODELS') {
+            return {
+              type: 'MODEL_CATALOG',
+              payload: {
+                models: [
+                  {
+                    id: 'claude-sonnet-4-6',
+                    name: 'Claude Sonnet 4.6',
+                    contextWindow: 200000,
+                    costPer1kInput: 0.003,
+                    costPer1kOutput: 0.015,
+                  },
+                ],
+              },
+            };
+          }
+
+          return {
+            type: 'ANNOTATIONS_READY',
+            payload: { annotations: [], usage: { inputTokens: 0, outputTokens: 0 } },
+          };
+        }),
       },
     });
     vi.stubGlobal('confirm', vi.fn(() => true));
@@ -139,6 +165,55 @@ describe('Options', () => {
     expect(await screen.findByDisplayValue('research-preview')).toBeTruthy();
   });
 
+  test('loads provider-backed model catalogs', async () => {
+    const sendMessage = vi.fn(async (message: { type: string }) => {
+      if (message.type === 'LIST_MODELS') {
+        return {
+          type: 'MODEL_CATALOG',
+          payload: {
+            models: [
+              {
+                id: 'openai/gpt-4.1-mini',
+                name: 'OpenAI GPT-4.1 mini',
+                contextWindow: 1047576,
+                costPer1kInput: 0.0004,
+                costPer1kOutput: 0.0016,
+              },
+            ],
+          },
+        };
+      }
+
+      return {
+        type: 'ANNOTATIONS_READY',
+        payload: { annotations: [], usage: { inputTokens: 0, outputTokens: 0 } },
+      };
+    });
+
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          get: vi.fn(async () => ({ readerProfile: null })),
+          remove: vi.fn(async () => undefined),
+        },
+      },
+      runtime: {
+        sendMessage,
+      },
+    });
+
+    render(<Options />);
+
+    fireEvent.change(await screen.findByLabelText('Active Provider'), {
+      target: { value: 'openrouter' },
+    });
+
+    await screen.findByText('OpenAI GPT-4.1 mini');
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'LIST_MODELS' }));
+    });
+  });
+
   test('shows connection errors and saves the full providers state', async () => {
     const sendMessage = vi.fn(async () => ({
       type: 'ERROR',
@@ -184,6 +259,6 @@ describe('Options', () => {
         openai: expect.objectContaining({ apiKey: 'saved-openai-key' }),
       }),
     }));
-    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'TEST_CONNECTION' }));
   });
 });

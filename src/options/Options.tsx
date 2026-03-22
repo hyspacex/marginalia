@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import type { ProviderConfigInput, ProviderId, ReaderProfile, StoredProvidersState } from '@/shared/types';
+import type { ModelOption, ProviderConfigInput, ProviderId, ReaderProfile, StoredProvidersState } from '@/shared/types';
 import { readingGraph } from '@/background/memory/reading-graph';
 import { providerDescriptors, getProviderDescriptor } from '@/background/llm/provider-registry';
 import {
@@ -11,12 +11,32 @@ import {
 import { usageTracker, type UsageTotals } from '@/background/usage-tracker';
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
+type CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 const EMPTY_TOTALS: UsageTotals = {
   inputTokens: 0,
   outputTokens: 0,
   estimatedCost: 0,
 };
+
+function ensureCurrentCatalogModel(models: readonly ModelOption[], modelId: string): ModelOption[] {
+  const normalizedModelId = modelId.trim();
+  const nextModels = [...models];
+  if (!normalizedModelId || nextModels.some((model) => model.id === normalizedModelId)) {
+    return nextModels;
+  }
+
+  return [
+    {
+      id: normalizedModelId,
+      name: `${normalizedModelId} (saved)`,
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+    ...nextModels,
+  ];
+}
 
 export function Options() {
   const [providersState, setProvidersState] = useState<StoredProvidersState>(createDefaultProvidersState());
@@ -26,6 +46,9 @@ export function Options() {
   const [usageTotals, setUsageTotals] = useState<UsageTotals>(EMPTY_TOTALS);
   const [graphCount, setGraphCount] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [modelCatalogs, setModelCatalogs] = useState<Partial<Record<ProviderId, ModelOption[]>>>({});
+  const [modelCatalogStatus, setModelCatalogStatus] = useState<Partial<Record<ProviderId, CatalogStatus>>>({});
+  const [modelCatalogMessage, setModelCatalogMessage] = useState<Partial<Record<ProviderId, string | null>>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +77,13 @@ export function Options() {
   const activeProviderId = providersState.activeProviderId;
   const activeDescriptor = getProviderDescriptor(activeProviderId);
   const activeConfig = activeDescriptor.normalizeConfig(providersState.configsByProvider[activeProviderId]);
-  const selectedModel = activeDescriptor.models.find((model) => model.id === activeConfig.modelId);
+  const catalogModels = ensureCurrentCatalogModel(
+    modelCatalogs[activeProviderId]?.length ? modelCatalogs[activeProviderId] as ModelOption[] : activeDescriptor.models,
+    activeConfig.modelId,
+  );
+  const selectedModel = catalogModels.find((model) => model.id === activeConfig.modelId);
+  const activeCatalogStatus = modelCatalogStatus[activeProviderId] || 'idle';
+  const activeCatalogMessage = modelCatalogMessage[activeProviderId] || null;
 
   const updateProviderState = (
     providerId: ProviderId,
@@ -78,6 +107,76 @@ export function Options() {
       ...patch,
     }));
   };
+
+  const refreshModelCatalog = async (
+    providerId: ProviderId = activeProviderId,
+    configInput = getProviderDescriptor(providerId).normalizeConfig(providersState.configsByProvider[providerId]),
+  ) => {
+    const descriptor = getProviderDescriptor(providerId);
+
+    if (!configInput.apiKey.trim()) {
+      setModelCatalogStatus((current) => ({ ...current, [providerId]: 'idle' }));
+      setModelCatalogMessage((current) => ({
+        ...current,
+        [providerId]: `Enter a ${descriptor.name} API key to load the latest model list.`,
+      }));
+      return;
+    }
+
+    setModelCatalogStatus((current) => ({ ...current, [providerId]: 'loading' }));
+    setModelCatalogMessage((current) => ({ ...current, [providerId]: null }));
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'LIST_MODELS',
+        payload: {
+          config: {
+            providerId,
+            ...configInput,
+          },
+        },
+      });
+
+      if (response.type === 'ERROR') {
+        throw new Error(response.payload.message);
+      }
+
+      if (response.type !== 'MODEL_CATALOG') {
+        throw new Error('Unexpected response while loading models');
+      }
+
+      setModelCatalogs((current) => ({
+        ...current,
+        [providerId]: response.payload.models,
+      }));
+      setModelCatalogStatus((current) => ({ ...current, [providerId]: 'ready' }));
+      setModelCatalogMessage((current) => ({ ...current, [providerId]: null }));
+    } catch (error) {
+      setModelCatalogStatus((current) => ({ ...current, [providerId]: 'error' }));
+      setModelCatalogMessage((current) => ({
+        ...current,
+        [providerId]: error instanceof Error
+          ? error.message
+          : `Failed to load the latest model list from ${descriptor.name}`,
+      }));
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void refreshModelCatalog(activeProviderId, activeConfig);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    activeProviderId,
+    activeConfig.apiKey,
+    activeConfig.baseUrl,
+    activeConfig.options.appTitle,
+    activeConfig.options.httpReferer,
+  ]);
 
   const handleSave = async () => {
     const normalizedState = await saveProvidersState(providersState);
@@ -221,7 +320,7 @@ export function Options() {
                 updateActiveConfig({ modelMode: nextMode });
               }}
             >
-              <option value="catalog">Curated catalog</option>
+              <option value="catalog">Provider catalog</option>
               <option value="custom">Custom model id</option>
             </select>
           </label>
@@ -234,7 +333,7 @@ export function Options() {
                 value={activeConfig.modelId}
                 onChange={(event) => updateActiveConfig({ modelId: (event.target as HTMLSelectElement).value })}
               >
-                {activeDescriptor.models.map((model) => (
+                {catalogModels.map((model) => (
                   <option key={model.id} value={model.id}>{model.name}</option>
                 ))}
               </select>
@@ -253,16 +352,33 @@ export function Options() {
           )}
         </div>
 
+        {activeConfig.modelMode === 'catalog' && (
+          <div class="model-catalog-actions">
+            <button
+              class="btn-secondary"
+              onClick={() => void refreshModelCatalog()}
+              disabled={activeCatalogStatus === 'loading' || !activeConfig.apiKey.trim()}
+            >
+              {activeCatalogStatus === 'loading' ? 'Loading models...' : 'Refresh models'}
+            </button>
+            {activeCatalogMessage && (
+              <p class={`catalog-message ${activeCatalogStatus === 'error' ? 'catalog-message-error' : ''}`}>
+                {activeCatalogMessage}
+              </p>
+            )}
+          </div>
+        )}
+
         <div class="model-meta">
           <span>
             Context window:{' '}
-            {selectedModel ? selectedModel.contextWindow.toLocaleString() : 'Custom / unknown'}
+            {selectedModel?.contextWindow != null ? selectedModel.contextWindow.toLocaleString() : 'Unknown'}
           </span>
           <span>
             Pricing:{' '}
             {selectedModel && selectedModel.costPer1kInput != null && selectedModel.costPer1kOutput != null
               ? `$${selectedModel.costPer1kInput.toFixed(4)} in / $${selectedModel.costPer1kOutput.toFixed(4)} out per 1K`
-              : 'Unavailable for custom models'}
+              : 'Unavailable for this model'}
           </span>
         </div>
 

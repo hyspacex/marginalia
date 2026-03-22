@@ -64,6 +64,7 @@ export interface ProviderTransport {
     request: TextRequest,
     onTextDelta: (delta: string) => void,
   ): Promise<StreamTextResult>;
+  listModels(config: ProviderConfig): Promise<ModelOption[]>;
   testConnection(config: ProviderConfig): Promise<void>;
 }
 

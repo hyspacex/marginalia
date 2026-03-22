@@ -1,8 +1,9 @@
 import type { ProviderConfig } from '@/shared/types';
-import { anthropicFixtures, openAiFixtures } from './__fixtures__/provider-fixtures';
+import { anthropicFixtures, openAiFixtures, openRouterFixtures } from './__fixtures__/provider-fixtures';
 import { ProviderError, type ProviderTransport } from './provider';
 import { createAnthropicTransport } from './providers/anthropic';
 import { createOpenAiTransport } from './providers/openai';
+import { createOpenRouterTransport } from './providers/openrouter';
 
 interface ProviderConformanceCase {
   name: string;
@@ -15,7 +16,16 @@ interface ProviderConformanceCase {
   createTransport: (fetchImpl: typeof fetch) => ProviderTransport;
   generateResponseBody: string;
   testConnectionBody: string;
+  listModelsBody: string;
   streamChunks: string[];
+  expectedListPath: string;
+  expectedListedModels: Array<{
+    id: string;
+    name: string;
+    contextWindow: number | null;
+    costPer1kInput: number | null;
+    costPer1kOutput: number | null;
+  }>;
   assertGenerateBody: (body: any) => void;
   assertStreamBody: (body: any) => void;
   assertTestBody: (body: any) => void;
@@ -120,6 +130,18 @@ function describeProviderTransportConformance(testCase: ProviderConformanceCase)
       await expect(transport.testConnection(testCase.config)).resolves.toBeUndefined();
     });
 
+    test('listModels uses the expected auth and normalizes the catalog', async () => {
+      const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+        expect(String(input)).toBe(`${testCase.config.baseUrl}${testCase.expectedListPath}`);
+        expectHeaders(init, testCase.expectedHeaders);
+        return createJsonResponse(testCase.listModelsBody);
+      });
+
+      const transport = testCase.createTransport(fetchMock);
+
+      await expect(transport.listModels(testCase.config)).resolves.toEqual(testCase.expectedListedModels);
+    });
+
     test.each([
       ['auth', 401, testCase.errorBodies.auth, 'auth'],
       ['rate limit', 429, testCase.errorBodies.rateLimit, 'rate_limit'],
@@ -161,7 +183,25 @@ describeProviderTransportConformance({
   createTransport: (fetchImpl) => createAnthropicTransport({ fetch: fetchImpl }),
   generateResponseBody: anthropicFixtures.generate.body,
   testConnectionBody: anthropicFixtures.testConnection.body,
+  listModelsBody: anthropicFixtures.listModels.body,
   streamChunks: anthropicFixtures.streamChunks,
+  expectedListPath: '/v1/models',
+  expectedListedModels: [
+    {
+      id: 'claude-haiku-3-5-20241022',
+      name: 'Claude Haiku 3.5',
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+    {
+      id: 'claude-sonnet-4-6',
+      name: 'Claude Sonnet 4.6',
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+  ],
   assertGenerateBody(body) {
     expect(body).toMatchObject({
       model: 'claude-sonnet-4-6',
@@ -210,7 +250,25 @@ describeProviderTransportConformance({
   createTransport: (fetchImpl) => createOpenAiTransport({ fetch: fetchImpl }),
   generateResponseBody: openAiFixtures.generate.body,
   testConnectionBody: openAiFixtures.testConnection.body,
+  listModelsBody: openAiFixtures.listModels.body,
   streamChunks: openAiFixtures.streamChunks,
+  expectedListPath: '/v1/models',
+  expectedListedModels: [
+    {
+      id: 'gpt-5.4-2026-03-05',
+      name: 'gpt-5.4-2026-03-05',
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+    {
+      id: 'o4-mini',
+      name: 'o4-mini',
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+  ],
   assertGenerateBody(body) {
     expect(body).toMatchObject({
       model: 'gpt-5.4-2026-03-05',
@@ -237,4 +295,67 @@ describeProviderTransportConformance({
     });
   },
   errorBodies: openAiFixtures.errors,
+});
+
+describeProviderTransportConformance({
+  name: 'OpenRouter',
+  config: {
+    providerId: 'openrouter',
+    apiKey: 'sk-or-test',
+    baseUrl: 'https://openrouter.ai/api',
+    modelMode: 'catalog',
+    modelId: 'openai/gpt-4.1-mini',
+    resolvedModel: 'openai/gpt-4.1-mini',
+    options: {},
+  },
+  successText: 'hello from openrouter',
+  generateUsage: { inputTokens: 14, outputTokens: 8 },
+  streamUsage: { inputTokens: 12, outputTokens: 7 },
+  expectedPath: '/v1/responses',
+  expectedHeaders: {
+    'content-type': 'application/json',
+    authorization: 'Bearer sk-or-test',
+    'x-title': 'Marginalia',
+  },
+  createTransport: (fetchImpl) => createOpenRouterTransport({ fetch: fetchImpl }),
+  generateResponseBody: openRouterFixtures.generate.body,
+  testConnectionBody: openRouterFixtures.testConnection.body,
+  listModelsBody: openRouterFixtures.listModels.body,
+  streamChunks: openRouterFixtures.streamChunks,
+  expectedListPath: '/v1/models/user',
+  expectedListedModels: [
+    {
+      id: 'openai/gpt-4.1-mini',
+      name: 'OpenAI GPT-4.1 mini',
+      contextWindow: 1047576,
+      costPer1kInput: 0.0004,
+      costPer1kOutput: 0.0016,
+    },
+  ],
+  assertGenerateBody(body) {
+    expect(body).toMatchObject({
+      model: 'openai/gpt-4.1-mini',
+      instructions: 'system prompt',
+      input: 'user prompt',
+      max_output_tokens: 256,
+      store: false,
+    });
+  },
+  assertStreamBody(body) {
+    expect(body).toMatchObject({
+      model: 'openai/gpt-4.1-mini',
+      stream: true,
+      store: false,
+    });
+  },
+  assertTestBody(body) {
+    expect(body).toMatchObject({
+      model: 'openai/gpt-4.1-mini',
+      instructions: 'Respond with "ok".',
+      input: 'Test',
+      max_output_tokens: 16,
+      store: false,
+    });
+  },
+  errorBodies: openRouterFixtures.errors,
 });

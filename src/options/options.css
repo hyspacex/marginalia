@@ -102,6 +102,24 @@ body {
   color: #475569;
 }
 
+.model-catalog-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.catalog-message {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.catalog-message-error {
+  color: #b91c1c;
+}
+
 .btn-primary {
   padding: 8px 20px;
   border: none;
@@ -240,6 +258,11 @@ body {
   }
 
   .options-actions {
+    flex-direction: column;
+  }
+
+  .model-catalog-actions {
+    align-items: stretch;
     flex-direction: column;
   }
 }

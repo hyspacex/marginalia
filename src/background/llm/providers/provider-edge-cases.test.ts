@@ -1,6 +1,7 @@
 import type { ProviderConfig } from '@/shared/types';
 import { createAnthropicTransport } from './anthropic';
 import { createOpenAiTransport } from './openai';
+import { createOpenRouterTransport } from './openrouter';
 
 function createSseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -35,6 +36,16 @@ const openAiConfig: ProviderConfig = {
   modelMode: 'catalog',
   modelId: 'gpt-5.4-2026-03-05',
   resolvedModel: 'gpt-5.4-2026-03-05',
+  options: {},
+};
+
+const openRouterConfig: ProviderConfig = {
+  providerId: 'openrouter',
+  apiKey: 'sk-or-test',
+  baseUrl: 'https://openrouter.ai/api',
+  modelMode: 'catalog',
+  modelId: 'openai/gpt-4.1-mini',
+  resolvedModel: 'openai/gpt-4.1-mini',
   options: {},
 };
 
@@ -174,6 +185,70 @@ describe('provider transport edge cases', () => {
     }, vi.fn())).rejects.toMatchObject({
       code: 'unknown',
       providerId: 'openai',
+      message: 'bad stream',
+    });
+  });
+
+  test('OpenRouter transport normalizes text and model catalog failures', async () => {
+    const transport = createOpenRouterTransport({
+      fetch: vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+        output: [{ content: [{ text: 'from openrouter output array' }] }],
+        usage: { input_tokens: 1, output_tokens: 2 },
+      }), { status: 200 })),
+    });
+
+    await expect(transport.generateText({
+      config: openRouterConfig,
+      systemPrompt: 'sys',
+      userPrompt: 'user',
+      maxOutputTokens: 10,
+    })).resolves.toEqual({
+      text: 'from openrouter output array',
+      usage: { inputTokens: 1, outputTokens: 2 },
+    });
+
+    const malformedCatalogTransport = createOpenRouterTransport({
+      fetch: vi.fn<typeof fetch>(async () => new Response('{}', { status: 200 })),
+    });
+
+    await expect(malformedCatalogTransport.listModels(openRouterConfig)).rejects.toMatchObject({
+      code: 'protocol',
+      providerId: 'openrouter',
+    });
+  });
+
+  test('OpenRouter stream errors surface protocol and provider failures', async () => {
+    const malformedTransport = createOpenRouterTransport({
+      fetch: vi.fn<typeof fetch>(async () => createSseResponse([
+        'data: {"type":"response.output_text.delta","delta":"ok"}\n\n',
+        'data: {"type":"response.output_text.delta"\n\n',
+      ])),
+    });
+
+    await expect(malformedTransport.streamText({
+      config: openRouterConfig,
+      systemPrompt: 'sys',
+      userPrompt: 'user',
+      maxOutputTokens: 10,
+    }, vi.fn())).rejects.toMatchObject({
+      code: 'protocol',
+      providerId: 'openrouter',
+    });
+
+    const failedTransport = createOpenRouterTransport({
+      fetch: vi.fn<typeof fetch>(async () => createSseResponse([
+        'data: {"type":"response.failed","response":{"error":{"message":"bad stream"}}}\n\n',
+      ])),
+    });
+
+    await expect(failedTransport.streamText({
+      config: openRouterConfig,
+      systemPrompt: 'sys',
+      userPrompt: 'user',
+      maxOutputTokens: 10,
+    }, vi.fn())).rejects.toMatchObject({
+      code: 'unknown',
+      providerId: 'openrouter',
       message: 'bad stream',
     });
   });
