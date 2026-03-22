@@ -25,20 +25,30 @@ const session: SessionState = {
   lastActiveAt: 1000,
 };
 
+let openOptionsPage: ReturnType<typeof vi.fn>;
+let sendMessage: ReturnType<typeof vi.fn>;
+
 describe('service worker persistence', () => {
   beforeEach(() => {
     vi.resetModules();
+    openOptionsPage = vi.fn();
+    sendMessage = vi.fn();
     vi.stubGlobal('chrome', {
+      action: {
+        onClicked: { addListener: vi.fn() },
+      },
       runtime: {
         onInstalled: { addListener: vi.fn() },
         onMessage: { addListener: vi.fn() },
         onConnect: { addListener: vi.fn() },
+        openOptionsPage,
       },
       alarms: {
         create: vi.fn(),
         onAlarm: { addListener: vi.fn() },
       },
       tabs: {
+        sendMessage,
         onUpdated: { addListener: vi.fn() },
         onRemoved: { addListener: vi.fn() },
       },
@@ -115,5 +125,65 @@ describe('service worker persistence', () => {
 
     expect(saveProfile).toHaveBeenCalledTimes(1);
     expect(addEntry).not.toHaveBeenCalled();
+  });
+
+  test('opens options from the toolbar click when no API key is configured', async () => {
+    vi.doMock('./llm/flows', () => ({
+      createLlmService: () => ({
+        updateReaderProfile: vi.fn(),
+        generatePageSummary: vi.fn(),
+        streamAnnotations: vi.fn(),
+        testConnection: vi.fn(),
+      }),
+    }));
+
+    vi.doMock('./llm/provider-storage', () => ({
+      getProvidersState: vi.fn(async () => ({ activeProviderId: 'anthropic', configsByProvider: {}, version: 1 })),
+      resolveProviderConfig: vi.fn(() => config),
+      hasProviderCredentials: vi.fn(() => false),
+    }));
+
+    vi.doMock('./llm/provider-registry', () => ({
+      getProviderDescriptor: vi.fn(() => ({
+        name: 'Anthropic',
+        estimateCost: vi.fn(() => 0),
+      })),
+    }));
+
+    const module = await import('./service-worker');
+    await module.handleActionClick({ id: 7 });
+
+    expect(openOptionsPage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('forwards the toolbar click to the content script when credentials exist', async () => {
+    vi.doMock('./llm/flows', () => ({
+      createLlmService: () => ({
+        updateReaderProfile: vi.fn(),
+        generatePageSummary: vi.fn(),
+        streamAnnotations: vi.fn(),
+        testConnection: vi.fn(),
+      }),
+    }));
+
+    vi.doMock('./llm/provider-storage', () => ({
+      getProvidersState: vi.fn(async () => ({ activeProviderId: 'anthropic', configsByProvider: {}, version: 1 })),
+      resolveProviderConfig: vi.fn(() => config),
+      hasProviderCredentials: vi.fn(() => true),
+    }));
+
+    vi.doMock('./llm/provider-registry', () => ({
+      getProviderDescriptor: vi.fn(() => ({
+        name: 'Anthropic',
+        estimateCost: vi.fn(() => 0),
+      })),
+    }));
+
+    const module = await import('./service-worker');
+    await module.handleActionClick({ id: 7 });
+
+    expect(openOptionsPage).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(7, { type: 'TOGGLE_ANNOTATIONS' }, expect.any(Function));
   });
 });

@@ -1,5 +1,5 @@
 import { PORT_NAME } from '@/shared/constants';
-import type { AnnotationRequest, PortMessage, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
+import type { AnnotationRequest, ContentMessage, PortMessage, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
 import { createLlmService } from './llm/flows';
 import { getProviderDescriptor } from './llm/provider-registry';
 import { getProvidersState, hasProviderCredentials, resolveProviderConfig } from './llm/provider-storage';
@@ -44,11 +44,35 @@ function ensureSessionIdleAlarm() {
   });
 }
 
+export async function handleActionClick(tab: chrome.tabs.Tab) {
+  if (!tab.id) return;
+
+  try {
+    const { config } = await getActiveProviderContext();
+    if (!hasProviderCredentials(config)) {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
+
+    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_ANNOTATIONS' } satisfies ContentMessage, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('Marginalia: Unable to annotate this tab:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (error) {
+    console.error('Marginalia: Toolbar click failed:', error);
+  }
+}
+
 function registerListeners() {
   ensureSessionIdleAlarm();
 
   chrome.runtime.onInstalled.addListener(() => {
     ensureSessionIdleAlarm();
+  });
+
+  chrome.action.onClicked.addListener((tab) => {
+    void handleActionClick(tab);
   });
 
   chrome.runtime.onMessage.addListener((

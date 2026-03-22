@@ -92,7 +92,6 @@ function copyExtensionFiles(): Plugin {
         version: '0.1.0',
         permissions: ['activeTab', 'alarms', 'storage', 'tabs'],
         action: {
-          default_popup: 'popup.html',
           default_icon: {
             '16': 'icons/icon-16.png',
             '48': 'icons/icon-48.png',
