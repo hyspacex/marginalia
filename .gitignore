@@ -1,8 +1,11 @@
 node_modules/
 dist/
 .vite/
+coverage/
 *.crx
 *.pem
 *.zip
 .env
 .env.local
+.gstack/
+notes/

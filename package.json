@@ -1,6 +1,6 @@
 {
   "name": "marginalia",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,9 +19,9 @@
   },
   "devDependencies": {
     "@testing-library/preact": "^3.2.4",
-    "@crxjs/vite-plugin": "^2.0.0-beta.30",
     "@types/chrome": "^0.0.304",
     "@vitest/coverage-v8": "^3.2.4",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^26.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.1.0",

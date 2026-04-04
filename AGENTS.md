@@ -1,79 +1,141 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to coding agents working in this repository.
 
 ## Build Commands
 
 - `npm run build` — TypeScript check + Vite production build to `dist/`
-- `npm run dev` — Vite dev server with HMR (uses @crxjs/vite-plugin beta)
-- No test runner configured
-- No linter configured
+- `npm run dev` — Vite dev server with HMR
+- `npm run test` — Run the full Vitest suite
+- `npm run test:coverage` — Run tests with V8 coverage output
+- No linter is configured
 
 Load the extension in Chrome via `chrome://extensions` → Load unpacked → select `dist/`.
 
-## Architecture
+## Current Product
 
-Chrome extension (Manifest V3) — AI reading companion that generates contextual inline annotations and a page summary via the Codex API. Annotations appear as text highlights with hover cards; the summary appears in a floating card above a bottom-right pill.
+Marginalia `0.2.0` is a Chrome extension reading companion that:
+
+- Streams inline annotations onto article text
+- Generates a floating page summary in parallel
+- Uses a three-layer memory system to adapt depth to the reader
+- Surfaces cross-article connections from an Active Reading Graph
+
+Connection annotations are staged in v1: the graph stores all typed edges (`supports`, `contradicts`, `refines`, `same-theme`), but the UI and prompts currently surface only `refines` and `same-theme`.
+
+## Architecture
 
 ### Entry Points
 
 | Entry | File | Role |
 |---|---|---|
-| Service Worker | `src/background/service-worker.ts` | Central message hub, orchestrates LLM + memory |
-| Content Script | `src/content/content-script.ts` | Shadow DOM UI injection, highlight management, state coordination |
-| Popup | `src/popup/Popup.tsx` | Toggle annotations, token stats |
-| Options | `src/options/Options.tsx` | API key, model selection, data management |
+| Service Worker | `src/background/service-worker.ts` | Message hub, session finalization, deferred claim extraction jobs |
+| Content Script | `src/content/content-script.ts` | Shadow DOM UI injection, highlight management, streaming UI state |
+| Popup | `src/popup/Popup.tsx` | Built but not wired — no `default_popup` in manifest; toolbar click uses `chrome.action.onClicked` directly |
+| Options | `src/options/Options.tsx` | Provider config, model selection, data clearing |
 
-### Build System
+### Content Script UI
 
-Vite + a **custom plugin** in `vite.config.ts` (`copyExtensionFiles()`) that builds each entry as a separate IIFE bundle, copies icons/CSS, generates HTML pages, and writes `manifest.json`. The crxjs beta is used only for dev HMR.
+All UI lives in a single Shadow DOM host (`#marginalia-host`) with three Preact components:
 
-### Communication
+- `HoverCard` — regular and connection annotation variants
+- `FloatingPill` — insight count, loading state, connection badge, visibility toggle
+- `SummaryCard` — summary text, expertise badge, surfaced connections
 
-- **Port-based streaming**: `chrome.runtime.connect(name: 'marginalia-stream')` for annotation chunks and page summary
-- **One-shot messages**: `chrome.runtime.sendMessage()` for config, interactions
+Highlighting uses the CSS Custom Highlight API with dual channels:
 
-### Content Script UI (`src/content/`)
+- `marginalia` for regular annotations
+- `marginalia-connection` for cross-article connection annotations
 
-All UI lives in a single Shadow DOM host (`#marginalia-host`). Three Preact components rendered together:
+### LLM Provider System
 
-- `HoverCard` — appears on highlight hover, positioned via `@floating-ui/dom`
-- `FloatingPill` — bottom-right pill showing annotation count/loading state
-- `SummaryCard` — floating card above the pill with page summary (skeleton loading → text)
+The extension supports three providers:
 
-State is managed via a plain `UIState` object + `setState()` pattern (no state library). CSS is imported as `?raw` strings into the Shadow DOM.
+- Anthropic
+- OpenAI
+- OpenRouter
 
-### LLM Integration (`src/background/llm/`)
+The provider stack is layered:
 
-Raw `fetch()` to Anthropic Messages API (no SDK — MV3 service workers can't use it). SSE streaming with JSONL output: each line is one `Annotation` object. Header `anthropic-dangerous-direct-browser-access: true` is required.
+1. `provider-registry.ts` defines descriptors and default config behavior
+2. `provider.ts` defines the transport interface and shared `ProviderError`
+3. `providers/*.ts` implement provider-specific HTTP and SSE handling
+4. `provider-model-catalog.ts` persists available models per provider
+5. `provider-storage.ts` manages provider config in `chrome.storage.local`
+6. `flows.ts` provides provider-agnostic operations:
+   - `streamAnnotations`
+   - `generatePageSummary`
+   - `updateReaderProfile`
+   - `extractClaimEdges`
+   - `testConnection`
+   - `listModels`
 
-- `anthropic.ts` — SSE parser that buffers incomplete JSONL lines at chunk boundaries
-- `prompt-builder.ts` — assembles system prompt from `src/prompts/*.txt` templates + memory context
-- `provider.ts` — `LLMProvider` interface (methods: `streamAnnotations`, `generateAnnotations`, `updateReaderProfile`, `generatePageSummary`, `testConnection`)
+### Memory System
+
+The extension uses three layers of memory:
+
+1. `ReaderProfile` in `chrome.storage.local`
+2. `ReadingGraph` in IndexedDB via Dexie
+3. In-memory `SessionState` in the service worker
+
+The reading graph now contains:
+
+- `pages`
+- `claimEdges`
+- `pendingExtractions`
+
+Supporting modules:
+
+- `memory-retriever.ts` assembles prompt context from profile, history, and connections
+- `connection-scorer.ts` scores claim edges for relevance to the current page
+- `session-tracker.ts` holds in-memory session state in the service worker
+- `usage-tracker.ts` tracks token usage across sessions
 
 ### Session Lifecycle
 
-`START_ANNOTATE` → session starts → memory context assembled → LLM streams annotations + generates summary **in parallel** (`Promise.all`) → annotation chunks posted to port as `ANNOTATION_CHUNK` → summary posted as `PAGE_SUMMARY` → `STREAM_DONE` → tab closes or 30min idle → session ends → profile updated → reading graph entry created.
+`START_ANNOTATE`
+→ session starts
+→ memory context assembled from local profile + graph
+→ annotations stream and page summary run in parallel
+→ `ANNOTATION_CHUNK` and enriched `PAGE_SUMMARY` messages go to the content script
+→ tab closes or idles out
+→ session is persisted to the reading graph
+→ a deferred claim-extraction job is enqueued
+→ alarm-driven processing turns stored page claims into graph edges
 
-### Content Extraction (`src/content/extraction/`)
+Claim extraction is intentionally deferred instead of running inline during session finalization so MV3 worker shutdowns do not drop user-visible work.
 
-`readability.ts` wraps `@mozilla/readability` to extract article text from the page DOM.
+## Testing
 
-### 3-Layer Memory System (`src/background/memory/`)
+Vitest runs in a `jsdom` environment. Important patterns:
 
-1. **Reader Profile** — `chrome.storage.local`; expertise, interests, preferences
-2. **Reading Graph** — IndexedDB via Dexie; pages, topics, claims, connections
-3. **Session Context** — In-memory `Map<tabId, SessionState>`; discarded on tab close or 30min idle
+- Chrome APIs must be mocked with `vi.stubGlobal('chrome', ...)`
+- UI tests use `@testing-library/preact`
+- Dexie-backed graph tests use `fake-indexeddb`
+- Provider conformance tests verify Anthropic, OpenAI, and OpenRouter against the same request/response expectations
 
-`memory-retriever.ts` assembles memory context (topic matches + domain history) into the LLM system prompt.
+Test suites:
+
+- `src/background/llm/provider-conformance.test.ts`
+- `src/background/llm/provider-storage.test.ts`
+- `src/background/llm/provider-model-catalog.test.ts`
+- `src/background/llm/providers/provider-edge-cases.test.ts`
+- `src/background/llm/flows.test.ts`
+- `src/background/llm/response-parsers.test.ts`
+- `src/background/llm/prompt-builder.test.ts`
+- `src/background/service-worker.test.ts`
+- `src/background/usage-tracker.test.ts`
+- `src/background/memory/reading-graph.test.ts`
+- `src/background/memory/memory-retriever.test.ts`
+- `src/background/memory/connection-scorer.test.ts`
+- `src/content/content-ui.test.tsx`
+- `src/options/Options.test.tsx`
 
 ## Key Conventions
 
-- **UI**: Preact with `jsxImportSource: preact` — import from `preact/hooks`, not React. `react`/`react-dom` are aliased to `preact/compat` in `vite.config.ts`. Content script uses `h()` calls directly (not JSX).
-- **Styling**: Plain CSS with Slate color scale design tokens, imported as `?raw` strings into Shadow DOM. No Tailwind.
-- **Rendering**: Annotation markdown converted via `marked` → sanitized with `DOMPurify` before injection.
-- **Prompts**: `.txt` files in `src/prompts/` imported via `?raw` suffix
-- **Path alias**: `@/*` maps to `src/*`
-- **Types**: All shared interfaces in `src/shared/types.ts`
-- **Message protocols**: `RequestMessage` (one-shot), `PortMessage` (streaming) — both defined in `types.ts`
-- **Output format**: JSONL (one annotation per line), not JSON arrays
+- Preact only: import hooks from `preact/hooks`
+- `react` and `react-dom` are aliased to `preact/compat`
+- Styling is plain CSS imported as `?raw` into the Shadow DOM
+- Shared types and wire protocols live in `src/shared/types.ts`
+- Prompt templates live in `src/prompts/*.txt`
+- Annotation and claim-edge streaming/parsing uses JSONL, not arrays
