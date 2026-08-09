@@ -85,12 +85,16 @@ function copyExtensionFiles(): Plugin {
 </html>`);
 
       // -- Write manifest --
+      const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
       const manifest = {
         manifest_version: 3,
         name: 'Marginalia',
         description: 'AI-powered reading companion — contextual annotations for any web page',
-        version: '0.1.0',
+        version: pkg.version,
         permissions: ['activeTab', 'alarms', 'storage', 'tabs'],
+        // Local OpenAI-compatible inference endpoint (plain HTTP, no CORS
+        // guarantees) — host permission exempts extension fetches from CORS.
+        host_permissions: ['http://100.82.7.89/*'],
         action: {
           default_icon: {
             '16': 'icons/icon-16.png',

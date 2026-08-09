@@ -4,6 +4,7 @@
   "description": "AI-powered reading companion — contextual annotations for any web page",
   "version": "0.2.0",
   "permissions": ["activeTab", "alarms", "storage", "tabs"],
+  "host_permissions": ["http://100.82.7.89/*"],
   "action": {
     "default_icon": {
       "16": "src/assets/icons/icon-16.png",
