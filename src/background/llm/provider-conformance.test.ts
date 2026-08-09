@@ -1,5 +1,6 @@
 import type { ProviderConfig } from '@/shared/types';
-import { anthropicFixtures, openAiFixtures, openRouterFixtures } from './__fixtures__/provider-fixtures';
+import { anthropicFixtures, localFixtures, openAiFixtures, openRouterFixtures } from './__fixtures__/provider-fixtures';
+import { createLocalTransport } from './providers/local';
 import { ProviderError, type ProviderTransport } from './provider';
 import { createAnthropicTransport } from './providers/anthropic';
 import { createOpenAiTransport } from './providers/openai';
@@ -358,4 +359,77 @@ describeProviderTransportConformance({
     });
   },
   errorBodies: openRouterFixtures.errors,
+});
+
+describeProviderTransportConformance({
+  name: 'Local (OpenAI-compatible)',
+  config: {
+    providerId: 'local',
+    apiKey: 'sk-local-test',
+    baseUrl: 'http://100.82.7.89:8317/v1',
+    modelMode: 'custom',
+    modelId: 'qwen3-32b',
+    resolvedModel: 'qwen3-32b',
+    options: {},
+  },
+  successText: 'hello from local',
+  generateUsage: { inputTokens: 7, outputTokens: 3 },
+  streamUsage: { inputTokens: 8, outputTokens: 6 },
+  expectedPath: '/chat/completions',
+  expectedHeaders: {
+    'content-type': 'application/json',
+    authorization: 'Bearer sk-local-test',
+  },
+  createTransport: (fetchImpl) => createLocalTransport({ fetch: fetchImpl }),
+  generateResponseBody: localFixtures.generate.body,
+  testConnectionBody: localFixtures.testConnection.body,
+  listModelsBody: localFixtures.listModels.body,
+  streamChunks: localFixtures.streamChunks,
+  expectedListPath: '/models',
+  expectedListedModels: [
+    {
+      id: 'llama-3.3-70b',
+      name: 'llama-3.3-70b',
+      contextWindow: 131072,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+    {
+      id: 'qwen3-32b',
+      name: 'qwen3-32b',
+      contextWindow: null,
+      costPer1kInput: null,
+      costPer1kOutput: null,
+    },
+  ],
+  assertGenerateBody(body) {
+    expect(body).toMatchObject({
+      model: 'qwen3-32b',
+      messages: [
+        { role: 'system', content: 'system prompt' },
+        { role: 'user', content: 'user prompt' },
+      ],
+      max_tokens: 256,
+      stream: false,
+    });
+  },
+  assertStreamBody(body) {
+    expect(body).toMatchObject({
+      model: 'qwen3-32b',
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+  },
+  assertTestBody(body) {
+    expect(body).toMatchObject({
+      model: 'qwen3-32b',
+      messages: [
+        { role: 'system', content: 'Respond with "ok".' },
+        { role: 'user', content: 'Test' },
+      ],
+      max_tokens: 16,
+      stream: false,
+    });
+  },
+  errorBodies: localFixtures.errors,
 });

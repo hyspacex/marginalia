@@ -143,3 +143,46 @@ export const openRouterFixtures = {
     server: JSON.stringify({ error: { message: 'server problem' } }),
   },
 };
+
+export const localFixtures = {
+  generate: {
+    body: JSON.stringify({
+      choices: [{ message: { role: 'assistant', content: 'hello from local' } }],
+      usage: {
+        prompt_tokens: 7,
+        completion_tokens: 3,
+      },
+    }),
+  },
+  testConnection: {
+    body: JSON.stringify({
+      choices: [{ message: { role: 'assistant', content: 'ok' } }],
+      usage: {
+        prompt_tokens: 3,
+        completion_tokens: 1,
+      },
+    }),
+  },
+  listModels: {
+    body: JSON.stringify({
+      object: 'list',
+      data: [
+        { id: 'qwen3-32b', object: 'model' },
+        { id: 'llama-3.3-70b', object: 'model', context_length: 131072 },
+      ],
+    }),
+  },
+  streamChunks: [
+    'data: {"choices":[{"delta":{"role":"assistant","content":""}}]}\n\n',
+    'data: {"choices":[{"delta":{"con',
+    'tent":"hel"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n',
+    'data: {"choices":[],"usage":{"prompt_tokens":8,"completion_tokens":6}}\n\n',
+    'data: [DONE]\n\n',
+  ],
+  errors: {
+    auth: JSON.stringify({ error: { message: 'bad key' } }),
+    rateLimit: JSON.stringify({ error: { message: 'slow down' } }),
+    server: JSON.stringify({ error: { message: 'server problem' } }),
+  },
+};

@@ -8,6 +8,7 @@ import {
   hasProviderCredentials,
   normalizeProvidersState,
   resolveProviderConfig,
+  resolveProviderConfigForModel,
   saveProvidersState,
 } from './provider-storage';
 
@@ -42,6 +43,25 @@ describe('provider storage', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  test('resolves the active provider config with a model override', () => {
+    const state = createDefaultProvidersState('anthropic');
+    state.configsByProvider.anthropic = getProviderDescriptor('anthropic').normalizeConfig({
+      apiKey: 'stored-key',
+      baseUrl: 'https://stored.anthropic.test',
+    });
+
+    const resolved = resolveProviderConfigForModel(state, 'claude-haiku-4-5-20251001');
+
+    expect(resolved).toMatchObject({
+      providerId: 'anthropic',
+      apiKey: 'stored-key',
+      baseUrl: 'https://stored.anthropic.test',
+      modelMode: 'custom',
+      modelId: 'claude-haiku-4-5-20251001',
+      resolvedModel: 'claude-haiku-4-5-20251001',
+    });
   });
 
   test('migrates legacy anthropic keys into the versioned provider state', () => {
@@ -109,6 +129,13 @@ describe('provider storage', () => {
           baseUrl: 'https://openrouter.ai/api',
           modelMode: 'catalog',
           modelId: 'openai/gpt-4.1-mini',
+          options: {},
+        },
+        local: {
+          apiKey: '',
+          baseUrl: 'http://100.82.7.89:8317/v1',
+          modelMode: 'catalog',
+          modelId: 'local-model',
           options: {},
         },
       },

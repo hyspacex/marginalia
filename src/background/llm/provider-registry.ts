@@ -8,6 +8,7 @@ import type { ProviderDescriptor } from './provider';
 import { createAnthropicTransport } from './providers/anthropic';
 import { createOpenAiTransport } from './providers/openai';
 import { createOpenRouterTransport } from './providers/openrouter';
+import { createLocalTransport } from './providers/local';
 
 const DEFAULT_MODEL_MODE = 'catalog' as const;
 
@@ -56,6 +57,16 @@ const OPENROUTER_MODELS: readonly ModelOption[] = [
   {
     id: 'openai/gpt-4.1-mini',
     name: 'OpenAI GPT-4.1 mini',
+    contextWindow: null,
+    costPer1kInput: null,
+    costPer1kOutput: null,
+  },
+];
+
+const LOCAL_MODELS: readonly ModelOption[] = [
+  {
+    id: 'local-model',
+    name: 'Default local model (refresh to list yours)',
     contextWindow: null,
     costPer1kInput: null,
     costPer1kOutput: null,
@@ -163,6 +174,33 @@ const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     ],
     createTransport: createOpenRouterTransport,
   }),
+  local: createProviderDescriptor({
+    id: 'local',
+    name: 'Local (OpenAI-compatible)',
+    description: 'A self-hosted OpenAI-compatible chat-completions server (llama.cpp, vLLM, LM Studio, Ollama, ...).',
+    defaultBaseUrl: 'http://100.82.7.89:8317/v1',
+    defaultModelId: 'local-model',
+    models: LOCAL_MODELS,
+    fields: [
+      {
+        key: 'apiKey',
+        label: 'API Key',
+        type: 'password',
+        target: 'apiKey',
+        placeholder: 'sk-... (whatever your server expects)',
+        required: true,
+      },
+      {
+        key: 'baseUrl',
+        label: 'Base URL',
+        type: 'url',
+        target: 'baseUrl',
+        placeholder: 'http://100.82.7.89:8317/v1',
+        helpText: 'API root including /v1. Requests go to <base>/chat/completions and <base>/models.',
+      },
+    ],
+    createTransport: createLocalTransport,
+  }),
 };
 
 function createProviderDescriptor(args: {
@@ -262,7 +300,7 @@ export const providerDescriptors = Object.freeze(
 export const DEFAULT_PROVIDER_ID: ProviderId = 'anthropic';
 
 export function isProviderId(value: string): value is ProviderId {
-  return value === 'anthropic' || value === 'openai' || value === 'openrouter';
+  return value === 'anthropic' || value === 'openai' || value === 'openrouter' || value === 'local';
 }
 
 export function getProviderDescriptor(providerId: ProviderId): ProviderDescriptor {

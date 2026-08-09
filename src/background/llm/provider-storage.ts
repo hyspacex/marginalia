@@ -110,6 +110,21 @@ export function resolveProviderConfig(
   return getProviderDescriptor(providerId).resolveConfig(state.configsByProvider[providerId]);
 }
 
+// Resolve the active provider's config with a different model — used for the
+// auto-summarize model override so the stored key/baseUrl still apply.
+export function resolveProviderConfigForModel(
+  state: StoredProvidersState,
+  modelId: string,
+): ProviderConfig {
+  const providerId = state.activeProviderId;
+  const stored = getStoredProviderConfig(state, providerId);
+  return getProviderDescriptor(providerId).resolveConfig({
+    ...stored,
+    modelMode: 'custom',
+    modelId,
+  });
+}
+
 export function hasProviderCredentials(config: StoredProviderConfig | ProviderConfig): boolean {
   return config.apiKey.trim().length > 0;
 }
