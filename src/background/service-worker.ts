@@ -1,9 +1,12 @@
 import { PORT_NAME } from '@/shared/constants';
-import type { AnnotationRequest, ContentMessage, PortMessage, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
+import type { AnnotationRequest, ContentMessage, PageSummaryV2, PortMessage, RequestMessage, ResponseMessage, SessionState } from '@/shared/types';
+import { classifyContent } from '@/shared/classify-content';
 import { createLlmService } from './llm/flows';
 import { estimateProviderCost, saveProviderModelCatalog } from './llm/provider-model-catalog';
 import { getProviderDescriptor } from './llm/provider-registry';
-import { getProvidersState, hasProviderCredentials, resolveProviderConfig } from './llm/provider-storage';
+import { getProvidersState, hasProviderCredentials, resolveProviderConfig, resolveProviderConfigForModel } from './llm/provider-storage';
+import { getAutoSummarizeSettings, saveAutoSummarizeSettings } from './settings/auto-summarize-storage';
+import { normalizeSiteEntry } from '@/shared/site-match';
 import { sessionTracker } from './memory/session-tracker';
 import { getMemoryContext } from './memory/memory-retriever';
 import { profileManager } from './memory/profile-manager';
@@ -37,6 +40,14 @@ function normalizeSessionUrl(url: string): string {
 
 function shouldFinalizeForUrlChange(currentUrl: string, nextUrl: string): boolean {
   return normalizeSessionUrl(currentUrl) !== normalizeSessionUrl(nextUrl);
+}
+
+// Older graph entries store a plain markdown summary; flattening the sectioned
+// summary keeps the retriever's prompt formatting working across both.
+function flattenSummary(summary: PageSummaryV2): string {
+  return summary.sections
+    .map((section) => `**${section.heading}**\n${section.markdown}`)
+    .join('\n\n');
 }
 
 function ensureSessionIdleAlarm() {
@@ -124,6 +135,25 @@ function registerListeners() {
             break;
           }
 
+          case 'ADD_AUTO_SITE': {
+            const normalized = normalizeSiteEntry(message.payload.hostname);
+            if (normalized) {
+              const settings = await getAutoSummarizeSettings();
+              if (!settings.sites.includes(normalized)) {
+                await saveAutoSummarizeSettings({
+                  ...settings,
+                  sites: [...settings.sites, normalized],
+                });
+              }
+            }
+
+            sendResponse({
+              type: 'ANNOTATIONS_READY',
+              payload: { annotations: [], usage: { inputTokens: 0, outputTokens: 0 } },
+            });
+            break;
+          }
+
           default:
             sendResponse({ type: 'ERROR', payload: { message: 'Unknown message type', code: 'UNKNOWN' } });
         }
@@ -147,10 +177,18 @@ function registerListeners() {
     port.onMessage.addListener(async (message: PortMessage) => {
       if (message.type !== 'START_ANNOTATE') return;
 
-      const { url, title, text } = message.payload;
+      const { url, title, text, metadata, mode } = message.payload;
 
       try {
-        const { config, descriptor } = await getActiveProviderContext();
+        const { providersState, config: activeConfig, descriptor } = await getActiveProviderContext();
+
+        let config = activeConfig;
+        if (mode === 'summary-only') {
+          const autoSettings = await getAutoSummarizeSettings();
+          if (autoSettings.autoModelId) {
+            config = resolveProviderConfigForModel(providersState, autoSettings.autoModelId);
+          }
+        }
 
         if (!hasProviderCredentials(config)) {
           port.postMessage({
@@ -174,39 +212,88 @@ function registerListeners() {
         }
 
         const memoryContext = await getMemoryContext(url, title, text, tabId);
-        const request: AnnotationRequest = {
-          pageContent: text,
-          memoryContext,
-          url,
-          title,
-        };
 
-        const annotationPromise = llmService.streamAnnotations(request, config, (annotation) => {
-          if (tabId) {
-            sessionTracker.addAnnotation(tabId, annotation);
+        const annotationPromise = mode === 'full'
+          ? llmService.streamAnnotations({
+              pageContent: text,
+              memoryContext,
+              url,
+              title,
+            } satisfies AnnotationRequest, config, (annotation) => {
+              if (tabId) {
+                sessionTracker.addAnnotation(tabId, annotation);
+              }
+              port.postMessage({ type: 'ANNOTATION_CHUNK', payload: { annotation } });
+            })
+          : Promise.resolve(null);
+
+        // A same-URL session may already carry a summary (auto-run before a
+        // toolbar click) — replay it instead of paying for a second one.
+        const existingSummary = tabId ? sessionTracker.getSession(tabId)?.pageSummary ?? null : null;
+
+        let summaryPromise: Promise<{ inputTokens: number; outputTokens: number } | null>;
+        if (existingSummary) {
+          port.postMessage({ type: 'SUMMARY_META', payload: { contentType: existingSummary.contentType } });
+          for (const section of existingSummary.sections) {
+            port.postMessage({ type: 'SUMMARY_SECTION', payload: { section } });
           }
-          port.postMessage({ type: 'ANNOTATION_CHUNK', payload: { annotation } });
-        });
-
-        const summaryPromise = llmService.generatePageSummary(text, title, config)
-          .then((summary) => {
-            if (tabId) {
-              sessionTracker.setPageSummary(tabId, summary);
-            }
-            port.postMessage({ type: 'PAGE_SUMMARY', payload: { summary: summary.summary } });
-          })
-          .catch((error) => {
-            console.error('Marginalia: Summary generation failed:', error);
+          port.postMessage({
+            type: 'SUMMARY_DONE',
+            payload: { keyClaims: existingSummary.keyClaims, topics: existingSummary.topics },
           });
+          summaryPromise = Promise.resolve(null);
+        } else {
+          const summaryRequest = {
+            text,
+            title,
+            url,
+            metadata,
+            contentType: classifyContent(metadata),
+            memoryContext,
+          };
 
-        const [{ usage }] = await Promise.all([annotationPromise, summaryPromise]);
-        await usageTracker.recordUsage({
-          providerId: config.providerId,
-          modelId: config.resolvedModel,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          estimatedCost: await estimateProviderCost(config, usage.inputTokens, usage.outputTokens),
-        });
+          summaryPromise = llmService.streamPageSummary(summaryRequest, config, {
+            onMeta: (contentType) => {
+              port.postMessage({ type: 'SUMMARY_META', payload: { contentType } });
+            },
+            onSection: (section) => {
+              port.postMessage({ type: 'SUMMARY_SECTION', payload: { section } });
+            },
+          })
+            .then(({ summary, usage }) => {
+              if (tabId) {
+                sessionTracker.setPageSummary(tabId, summary);
+              }
+              port.postMessage({
+                type: 'SUMMARY_DONE',
+                payload: { keyClaims: summary.keyClaims, topics: summary.topics },
+              });
+              return usage;
+            })
+            .catch((error) => {
+              console.error('Marginalia: Summary generation failed:', error);
+              port.postMessage({
+                type: 'SUMMARY_ERROR',
+                payload: { message: error instanceof Error ? error.message : String(error) },
+              });
+              return null;
+            });
+        }
+
+        const [annotationResult, summaryUsage] = await Promise.all([annotationPromise, summaryPromise]);
+        const usage = {
+          inputTokens: (annotationResult?.usage.inputTokens ?? 0) + (summaryUsage?.inputTokens ?? 0),
+          outputTokens: (annotationResult?.usage.outputTokens ?? 0) + (summaryUsage?.outputTokens ?? 0),
+        };
+        if (annotationResult || summaryUsage) {
+          await usageTracker.recordUsage({
+            providerId: config.providerId,
+            modelId: config.resolvedModel,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            estimatedCost: await estimateProviderCost(config, usage.inputTokens, usage.outputTokens),
+          });
+        }
 
         port.postMessage({ type: 'STREAM_DONE', payload: { usage } });
       } catch (error) {
@@ -239,6 +326,17 @@ function registerListeners() {
     if (session && shouldFinalizeForUrlChange(session.url, changeInfo.url)) {
       void endSession(tabId);
     }
+
+    // Let the tab's content script re-evaluate auto-summarize for SPA
+    // navigations that don't reload the page.
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: 'PAGE_NAVIGATED', payload: { url: changeInfo.url } } satisfies ContentMessage,
+      () => {
+        // Ignore tabs without the content script (chrome:// pages etc.).
+        void chrome.runtime.lastError;
+      },
+    );
   });
 
   chrome.tabs.onRemoved.addListener(async (tabId) => {
@@ -255,21 +353,25 @@ async function endSession(tabId: number) {
 }
 
 export async function persistSession(session: SessionState | undefined) {
-  if (!session || session.annotations.length === 0) return;
+  if (!session) return;
+  if (session.annotations.length === 0 && session.pageSummary === null) return;
 
   try {
     const { config } = await getActiveProviderContext();
     if (!hasProviderCredentials(config)) return;
 
-    const profile = await profileManager.getProfile();
-    if (profile) {
-      const updatedProfile = await llmService.updateReaderProfile(profile, session, config);
-      await profileManager.saveProfile(updatedProfile);
+    // Profile updates need interaction signal; summary-only visits shouldn't
+    // spend a profile call or overwrite the profile from low-signal data.
+    if (session.annotations.length > 0 || session.interactions.length > 0) {
+      const profile = await profileManager.getProfile();
+      if (profile) {
+        const updatedProfile = await llmService.updateReaderProfile(profile, session, config);
+        await profileManager.saveProfile(updatedProfile);
+      }
     }
 
     try {
-      const summary = session.pageSummary ??
-        await llmService.generatePageSummary(session.pageContent, session.title, config);
+      const summary = session.pageSummary;
 
       await readingGraph.addEntry({
         url: session.url,
@@ -277,9 +379,11 @@ export async function persistSession(session: SessionState | undefined) {
         domain: new URL(session.url).hostname,
         readAt: new Date(session.startedAt).toISOString(),
         durationSeconds: Math.round((session.lastActiveAt - session.startedAt) / 1000),
-        summary: summary.summary,
-        keyClaims: summary.keyClaims,
-        topics: summary.topics,
+        summary: summary ? flattenSummary(summary) : '',
+        keyClaims: summary?.keyClaims ?? [],
+        topics: summary?.topics ?? [],
+        contentType: summary?.contentType,
+        sections: summary?.sections,
         savedAnnotations: session.annotations.filter((annotation) =>
           session.interactions.some((interaction) =>
             interaction.type === 'save' && interaction.annotationId === annotation.id,
@@ -287,7 +391,7 @@ export async function persistSession(session: SessionState | undefined) {
         ),
       });
     } catch (error) {
-      console.error('Marginalia: Error generating page summary:', error);
+      console.error('Marginalia: Error persisting reading graph entry:', error);
     }
   } catch (error) {
     console.error('Marginalia: Error ending session:', error);

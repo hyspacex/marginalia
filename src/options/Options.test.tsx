@@ -83,6 +83,7 @@ describe('Options', () => {
       storage: {
         local: {
           get: vi.fn(async () => ({ readerProfile: null })),
+          set: vi.fn(async () => undefined),
           remove: vi.fn(async () => undefined),
         },
       },
@@ -117,6 +118,54 @@ describe('Options', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  test('adds, dedupes, and removes auto-summarize sites', async () => {
+    render(<Options />);
+
+    const input = await screen.findByPlaceholderText('nytimes.com');
+    fireEvent.input(input, { target: { value: 'https://www.nytimes.com/section/politics' } });
+    fireEvent.click(screen.getByText('Add'));
+
+    await screen.findByText('nytimes.com');
+
+    fireEvent.input(input, { target: { value: 'nytimes.com' } });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => {
+      expect(screen.getAllByText('nytimes.com')).toHaveLength(1);
+    });
+
+    fireEvent.input(input, { target: { value: 'invalid' } });
+    fireEvent.click(screen.getByText('Add'));
+    await screen.findByText('Enter a valid domain, e.g. nytimes.com');
+
+    fireEvent.click(screen.getByText('Remove'));
+    await waitFor(() => {
+      expect(screen.queryByText('nytimes.com')).toBeNull();
+    });
+  });
+
+  test('persists the auto-summarize toggle and model override', async () => {
+    render(<Options />);
+
+    const checkbox = await screen.findByLabelText('Enable auto-summarize on listed sites');
+    fireEvent.click(checkbox);
+
+    await waitFor(() => {
+      expect(chrome.storage.local.set).toHaveBeenCalledWith(expect.objectContaining({
+        autoSummarizeSettings: expect.objectContaining({ enabled: false }),
+      }));
+    });
+
+    fireEvent.change(screen.getByLabelText(/Model for auto-runs/), {
+      target: { value: 'claude-sonnet-4-6' },
+    });
+
+    await waitFor(() => {
+      expect(chrome.storage.local.set).toHaveBeenCalledWith(expect.objectContaining({
+        autoSummarizeSettings: expect.objectContaining({ autoModelId: 'claude-sonnet-4-6' }),
+      }));
+    });
   });
 
   test('preserves inactive provider config when switching providers', async () => {

@@ -1,11 +1,13 @@
 import { render, h } from 'preact';
 import { PORT_NAME, HIGHLIGHT_COLORS, CARD_CONFIG } from '@/shared/constants';
-import type { Annotation, PortMessage, ContentMessage } from '@/shared/types';
+import type { Annotation, ContentType, PortMessage, ContentMessage, SessionMode, SummarySection } from '@/shared/types';
+import { initAutoTrigger, type AutoTriggerController } from './auto/auto-trigger';
 import { highlightManager } from './highlighter/highlight-manager';
 import { HoverCard } from './card/HoverCard';
 import { FloatingPill } from './pill/FloatingPill';
 import { SummaryCard } from './summary/SummaryCard';
 import { extractPageContent } from './extraction/readability';
+import { collectPageMetadata } from './extraction/page-metadata';
 import inlineCSS from './styles/inline.css?raw';
 
 const HOST_ID = 'marginalia-host';
@@ -20,7 +22,9 @@ interface UIState {
   highlightsVisible: boolean;
   hoverAnnotation: Annotation | null;
   hoverRect: DOMRect | null;
-  summaryText: string | null;
+  summarySections: SummarySection[];
+  summaryContentType: ContentType | null;
+  summaryError: string | null;
   summaryLoading: boolean;
   summaryPinned: boolean;
   summaryHoverActive: boolean;
@@ -32,7 +36,9 @@ let state: UIState = {
   highlightsVisible: true,
   hoverAnnotation: null,
   hoverRect: null,
-  summaryText: null,
+  summarySections: [],
+  summaryContentType: null,
+  summaryError: null,
   summaryLoading: false,
   summaryPinned: false,
   summaryHoverActive: false,
@@ -41,6 +47,7 @@ let state: UIState = {
 let renderUI: (() => void) | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 let summaryCloseTimer: ReturnType<typeof setTimeout> | null = null;
+let autoTrigger: AutoTriggerController | null = null;
 
 function setState(partial: Partial<UIState>) {
   Object.assign(state, partial);
@@ -55,7 +62,7 @@ function cancelSummaryClose() {
 }
 
 function hasSummaryContent() {
-  return state.summaryLoading || state.summaryText !== null;
+  return state.summaryLoading || state.summarySections.length > 0 || state.summaryError !== null;
 }
 
 function showSummary() {
@@ -132,6 +139,8 @@ function injectHost() {
           count: state.annotations.length,
           loading: state.loading,
           visible: state.highlightsVisible,
+          hasSummary: state.summarySections.length > 0 || state.summaryError !== null,
+          summaryLoading: state.summaryLoading,
           onMouseEnter: showSummary,
           onMouseLeave: scheduleSummaryClose,
           onToggle: () => {
@@ -142,11 +151,27 @@ function injectHost() {
               setState({ hoverAnnotation: null, hoverRect: null });
             }
           },
+          onShowSummary: () => {
+            if (hasSummaryContent()) {
+              cancelSummaryClose();
+              setState({ summaryPinned: true, summaryHoverActive: true });
+            }
+          },
         }),
         h(SummaryCard, {
-          summary: state.summaryText,
+          sections: state.summarySections,
+          contentType: state.summaryContentType,
+          error: state.summaryError,
           loading: state.summaryLoading,
           visible: hasSummaryContent() && (state.summaryPinned || state.summaryHoverActive),
+          quickAddHost: autoTrigger ? window.location.hostname : null,
+          quickAddAdded: autoTrigger?.isSiteListed() ?? false,
+          onQuickAdd: () => {
+            void chrome.runtime.sendMessage({
+              type: 'ADD_AUTO_SITE',
+              payload: { hostname: window.location.hostname },
+            });
+          },
           onMouseEnter: showSummary,
           onMouseLeave: scheduleSummaryClose,
           onClose: () => {
@@ -167,8 +192,8 @@ function injectHost() {
   });
 }
 
-// --- Annotation flow ---
-function startAnnotating() {
+// --- Session flow ---
+function startSession(mode: SessionMode) {
   if (annotating) return;
 
   const content = extractPageContent();
@@ -176,18 +201,33 @@ function startAnnotating() {
 
   annotating = true;
   cancelSummaryClose();
-  highlightManager.clear();
-  setState({
-    annotations: [],
-    loading: true,
-    highlightsVisible: true,
-    hoverAnnotation: null,
-    hoverRect: null,
-    summaryText: null,
-    summaryLoading: true,
-    summaryPinned: true,
-    summaryHoverActive: false,
-  });
+
+  if (mode === 'full') {
+    highlightManager.clear();
+    setState({
+      annotations: [],
+      loading: true,
+      highlightsVisible: true,
+      hoverAnnotation: null,
+      hoverRect: null,
+      summarySections: [],
+      summaryContentType: null,
+      summaryError: null,
+      summaryLoading: true,
+      summaryPinned: true,
+      summaryHoverActive: false,
+    });
+  } else {
+    // Auto-run: ambient summary, no annotation UI churn, not pinned.
+    setState({
+      summarySections: [],
+      summaryContentType: null,
+      summaryError: null,
+      summaryLoading: true,
+      summaryPinned: false,
+      summaryHoverActive: false,
+    });
+  }
 
   const port = chrome.runtime.connect({ name: PORT_NAME });
 
@@ -197,6 +237,8 @@ function startAnnotating() {
       url: content.url,
       title: content.title,
       text: content.content,
+      metadata: collectPageMetadata(content),
+      mode,
     },
   } satisfies PortMessage);
 
@@ -212,12 +254,25 @@ function startAnnotating() {
         }
         break;
       }
-      case 'PAGE_SUMMARY':
+      case 'SUMMARY_META':
+        setState({ summaryContentType: msg.payload.contentType });
+        break;
+      case 'SUMMARY_SECTION':
         setState({
-          summaryText: msg.payload.summary,
+          summarySections: [...state.summarySections, msg.payload.section],
+        });
+        break;
+      case 'SUMMARY_DONE':
+        setState({
           summaryLoading: false,
           summaryPinned: true,
           summaryHoverActive: false,
+        });
+        break;
+      case 'SUMMARY_ERROR':
+        setState({
+          summaryError: msg.payload.message,
+          summaryLoading: false,
         });
         break;
       case 'STREAM_DONE':
@@ -241,11 +296,11 @@ function startAnnotating() {
   });
 }
 
-// --- Message listener (from popup) ---
+// --- Message listener (toolbar/popup + service worker) ---
 chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResponse) => {
   if (message.type === 'TOGGLE_ANNOTATIONS') {
     if (state.annotations.length === 0 && !annotating) {
-      startAnnotating();
+      startSession('full');
       sendResponse({ annotating: true });
     } else {
       const next = !state.highlightsVisible;
@@ -253,6 +308,9 @@ chrome.runtime.onMessage.addListener((message: ContentMessage, _sender, sendResp
       setState({ highlightsVisible: next });
       sendResponse({ visible: next });
     }
+  } else if (message.type === 'PAGE_NAVIGATED') {
+    autoTrigger?.evaluate('nav');
+    sendResponse({ ok: true });
   }
   return true;
 });
@@ -280,6 +338,18 @@ function init() {
       }, CARD_CONFIG.closeDelay);
     },
   );
+
+  autoTrigger = initAutoTrigger({
+    onTrigger: () => startSession('summary-only'),
+    onSettingsChange: () => renderUI?.(),
+  });
+
+  // Extra SPA-navigation signals beyond the service worker's tabs.onUpdated
+  // forward; the per-URL dedup inside the trigger makes over-firing harmless.
+  window.addEventListener('popstate', () => autoTrigger?.evaluate('nav'));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) autoTrigger?.evaluate('nav');
+  });
 }
 
 init();

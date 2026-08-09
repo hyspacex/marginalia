@@ -9,6 +9,13 @@ import {
   saveProvidersState,
 } from '@/background/llm/provider-storage';
 import { usageTracker, type UsageTotals } from '@/background/usage-tracker';
+import {
+  createDefaultAutoSummarizeSettings,
+  getAutoSummarizeSettings,
+  saveAutoSummarizeSettings,
+  type AutoSummarizeSettings,
+} from '@/background/settings/auto-summarize-storage';
+import { normalizeSiteEntry } from '@/shared/site-match';
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'error';
 type CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -49,16 +56,20 @@ export function Options() {
   const [modelCatalogs, setModelCatalogs] = useState<Partial<Record<ProviderId, ModelOption[]>>>({});
   const [modelCatalogStatus, setModelCatalogStatus] = useState<Partial<Record<ProviderId, CatalogStatus>>>({});
   const [modelCatalogMessage, setModelCatalogMessage] = useState<Partial<Record<ProviderId, string | null>>>({});
+  const [autoSettings, setAutoSettings] = useState<AutoSummarizeSettings>(createDefaultAutoSummarizeSettings());
+  const [siteInput, setSiteInput] = useState('');
+  const [siteError, setSiteError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const [nextProvidersState, usage, result, nextGraphCount] = await Promise.all([
+      const [nextProvidersState, usage, result, nextGraphCount, nextAutoSettings] = await Promise.all([
         getProvidersState(),
         usageTracker.getTotals(),
         chrome.storage.local.get('readerProfile'),
         readingGraph.getCount(),
+        getAutoSummarizeSettings(),
       ]);
 
       if (cancelled) return;
@@ -67,6 +78,7 @@ export function Options() {
       setUsageTotals(usage);
       setProfile((result.readerProfile as ReaderProfile | undefined) || null);
       setGraphCount(nextGraphCount);
+      setAutoSettings(nextAutoSettings);
     })();
 
     return () => {
@@ -217,6 +229,30 @@ export function Options() {
     }, 3000);
   };
 
+  const persistAutoSettings = async (next: AutoSummarizeSettings) => {
+    const normalized = await saveAutoSummarizeSettings(next);
+    setAutoSettings(normalized);
+  };
+
+  const handleAddSite = async () => {
+    const normalized = normalizeSiteEntry(siteInput);
+    if (!normalized) {
+      setSiteError('Enter a valid domain, e.g. nytimes.com');
+      return;
+    }
+    setSiteError(null);
+    setSiteInput('');
+    if (autoSettings.sites.includes(normalized)) return;
+    await persistAutoSettings({ ...autoSettings, sites: [...autoSettings.sites, normalized] });
+  };
+
+  const handleRemoveSite = async (site: string) => {
+    await persistAutoSettings({
+      ...autoSettings,
+      sites: autoSettings.sites.filter((entry) => entry !== site),
+    });
+  };
+
   const handleClearData = async () => {
     if (!confirm('Clear all reading history and profile data? This cannot be undone.')) {
       return;
@@ -237,7 +273,8 @@ export function Options() {
 
   return (
     <div class="options">
-      <h1>Marginalia Settings</h1>
+      <h1>Marginalia</h1>
+      <p class="options-subtitle">Your AI reading companion — annotations, structured summaries, and memory.</p>
 
       <section class="options-section">
         <div class="section-header">
@@ -402,6 +439,93 @@ export function Options() {
             {testMessage}
           </p>
         )}
+      </section>
+
+      <section class="options-section">
+        <div class="section-header">
+          <div>
+            <h2>Auto-Summarize</h2>
+            <p class="section-copy">
+              Automatically generate a structured summary (no inline annotations) when you open an
+              article on these sites. Spend shows up under Usage.
+            </p>
+          </div>
+        </div>
+
+        <label class="options-label checkbox-label">
+          <input
+            type="checkbox"
+            checked={autoSettings.enabled}
+            onChange={(event) => {
+              void persistAutoSettings({
+                ...autoSettings,
+                enabled: (event.target as HTMLInputElement).checked,
+              });
+            }}
+          />
+          Enable auto-summarize on listed sites
+        </label>
+
+        <label class="options-label">
+          Add a site
+          <div class="site-add-row">
+            <input
+              type="text"
+              class="options-input"
+              value={siteInput}
+              placeholder="nytimes.com"
+              onInput={(event) => {
+                setSiteInput((event.target as HTMLInputElement).value);
+                setSiteError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void handleAddSite();
+              }}
+            />
+            <button class="btn-secondary" onClick={() => void handleAddSite()}>Add</button>
+          </div>
+          {siteError && <span class="field-help field-error">{siteError}</span>}
+        </label>
+
+        {autoSettings.sites.length > 0 ? (
+          <ul class="site-list">
+            {autoSettings.sites.map((site) => (
+              <li key={site} class="site-list-item">
+                <span>{site}</span>
+                <button class="btn-secondary" onClick={() => void handleRemoveSite(site)}>Remove</button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p class="section-copy">No sites yet. Subdomains are included automatically (nytimes.com covers cooking.nytimes.com).</p>
+        )}
+
+        <label class="options-label">
+          Model for auto-runs
+          <select
+            class="options-input"
+            value={autoSettings.autoModelId ?? ''}
+            onChange={(event) => {
+              const value = (event.target as HTMLSelectElement).value;
+              void persistAutoSettings({
+                ...autoSettings,
+                autoModelId: value === '' ? null : value,
+              });
+            }}
+          >
+            <option value="">Same as manual runs</option>
+            {catalogModels.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.costPer1kInput != null && model.costPer1kOutput != null
+                  ? `${model.name} ($${model.costPer1kInput.toFixed(4)}/$${model.costPer1kOutput.toFixed(4)} per 1K)`
+                  : model.name}
+              </option>
+            ))}
+          </select>
+          <span class="field-help">
+            Pick a cheaper {activeDescriptor.name} model to keep automatic summaries inexpensive.
+          </span>
+        </label>
       </section>
 
       <section class="options-section">
