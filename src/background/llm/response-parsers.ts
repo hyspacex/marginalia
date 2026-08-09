@@ -1,4 +1,4 @@
-import type { Annotation, PageSummary, ProviderId, ReaderProfile } from '@/shared/types';
+import type { Annotation, ContentType, ProviderId, ReaderProfile, SummarySection } from '@/shared/types';
 import { ProviderError } from './provider';
 
 const EXPERTISE_LEVELS = new Set(['beginner', 'intermediate', 'advanced']);
@@ -34,24 +34,75 @@ export function createAnnotationStreamParser(deps: {
   };
 }
 
-export function parsePageSummary(text: string, providerId: ProviderId): PageSummary {
-  const parsed = parseJsonObject(text, 'summary', providerId);
+const CONTENT_TYPES = new Set<string>([
+  'news-report',
+  'opinion-analysis',
+  'technical-blog',
+  'research-paper',
+  'other',
+]);
 
-  if (
-    typeof parsed.summary !== 'string' ||
-    !Array.isArray(parsed.keyClaims) ||
-    !parsed.keyClaims.every((entry: unknown) => typeof entry === 'string') ||
-    !Array.isArray(parsed.topics) ||
-    !parsed.topics.every((entry: unknown) => typeof entry === 'string')
-  ) {
-    throw new ProviderError(providerId, 'protocol', 'Summary response did not match the expected shape');
+export interface SummaryStreamHandlers {
+  onMeta?: (contentType: ContentType) => void;
+  onSection?: (section: SummarySection) => void;
+  onGraph?: (graph: { keyClaims: string[]; topics: string[] }) => void;
+}
+
+// Line-buffered JSONL parser for the structured summary stream; malformed
+// lines are dropped, mirroring the annotation stream's tolerance.
+export function createSummaryStreamParser(handlers: SummaryStreamHandlers) {
+  function handleLine(line: string) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('{')) return;
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return;
+    }
+
+    if (parsed.kind === 'meta' && typeof parsed.contentType === 'string' && CONTENT_TYPES.has(parsed.contentType)) {
+      handlers.onMeta?.(parsed.contentType as ContentType);
+    } else if (
+      parsed.kind === 'section' &&
+      typeof parsed.id === 'string' &&
+      typeof parsed.heading === 'string' &&
+      typeof parsed.markdown === 'string' &&
+      parsed.markdown.trim() !== ''
+    ) {
+      handlers.onSection?.({ id: parsed.id, heading: parsed.heading, markdown: parsed.markdown });
+    } else if (parsed.kind === 'graph' && isStringArray(parsed.keyClaims) && isStringArray(parsed.topics)) {
+      handlers.onGraph?.({ keyClaims: parsed.keyClaims, topics: parsed.topics });
+    }
   }
 
+  let buffer = '';
+
   return {
-    summary: parsed.summary,
-    keyClaims: parsed.keyClaims,
-    topics: parsed.topics,
+    push(delta: string) {
+      buffer += delta;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) handleLine(line);
+    },
+
+    flush() {
+      if (!buffer.trim()) {
+        buffer = '';
+        return;
+      }
+      // The final line often lacks its trailing newline; recover a complete
+      // object from the residue with the brace scanner.
+      const jsonText = extractFirstJsonObject(buffer);
+      buffer = '';
+      if (jsonText) handleLine(jsonText);
+    },
   };
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }
 
 export function parseReaderProfile(text: string, now: () => number, providerId: ProviderId): ReaderProfile {

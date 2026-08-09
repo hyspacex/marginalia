@@ -1,4 +1,4 @@
-import type { Annotation, PageSummary, SessionState, UserInteraction } from '@/shared/types';
+import type { Annotation, PageSummaryV2, SessionState, UserInteraction } from '@/shared/types';
 import { SESSION_IDLE_TIMEOUT_MS } from '@/shared/constants';
 
 const sessions = new Map<number, SessionState>();
@@ -38,7 +38,7 @@ export const sessionTracker = {
     }
   },
 
-  setPageSummary(tabId: number, pageSummary: PageSummary) {
+  setPageSummary(tabId: number, pageSummary: PageSummaryV2) {
     const session = sessions.get(tabId);
     if (session) {
       session.pageSummary = pageSummary;

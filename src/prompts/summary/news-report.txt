@@ -1,0 +1,9 @@
+Content type: news-report — a factual news article.
+
+Sections, in order:
+1. id "what-happened", heading "What happened" — the 5W core (who, what, when, where, why) in 2-4 bullets. Facts only, no framing.
+2. id "why-it-matters", heading "Why it matters" — 1-2 bullets on the stakes and likely consequences.
+3. id "net-new", heading "New to you" — the net-new section (see base rules).
+4. id "fact-vs-framing", heading "Facts vs. framing" — separate what is verified or attributed from the author's framing: whose voices are quoted, whose are absent, what the account omits or downplays.
+5. id "critical-thinking", heading "Read critically" — 2-3 article-specific prompts in the spirit of SIFT and lateral reading: a specific claim worth tracing to its original source, a specific actor or term worth investigating in another tab, or specific better coverage worth comparing. Never generic advice like "check the source".
+6. id "whats-next", heading "What's next" — expected developments, decisions, or dates, only if the article supports them.

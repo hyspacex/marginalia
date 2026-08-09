@@ -2,37 +2,48 @@ interface FloatingPillProps {
   count: number;
   loading: boolean;
   visible: boolean;
+  hasSummary: boolean;
+  summaryLoading: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onToggle: () => void;
+  onShowSummary: () => void;
 }
 
 export function FloatingPill({
   count,
   loading,
   visible,
+  hasSummary,
+  summaryLoading,
   onMouseEnter,
   onMouseLeave,
   onToggle,
+  onShowSummary,
 }: FloatingPillProps) {
-  if (count === 0 && !loading) return null;
+  const summaryOnly = count === 0 && !loading;
+  if (summaryOnly && !hasSummary && !summaryLoading) return null;
+
+  const busy = loading || (summaryOnly && summaryLoading);
 
   const label = loading
-    ? 'Analyzing...'
-    : `${count} insight${count !== 1 ? 's' : ''}`;
+    ? 'Analyzing…'
+    : summaryOnly
+      ? summaryLoading ? 'Summarizing…' : 'Summary'
+      : `${count} insight${count !== 1 ? 's' : ''}`;
 
-  const icon = loading ? '\u25CF' : visible ? '\u25C9' : '\u25CB';
+  const stateClass = busy ? 'is-busy' : !visible && !summaryOnly ? 'is-off' : 'is-on';
 
   return (
     <div
-      class={`marginalia-pill ${loading ? 'loading' : ''} ${!visible && !loading ? 'hidden-state' : ''}`}
+      class={`marginalia-pill ${stateClass}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      onClick={onToggle}
-      title={visible ? 'Hide annotations' : 'Show annotations'}
+      onClick={summaryOnly ? onShowSummary : onToggle}
+      title={summaryOnly ? 'Show summary' : visible ? 'Hide annotations' : 'Show annotations'}
     >
-      <span class="marginalia-pill-icon">{icon}</span>
-      <span>{label}</span>
+      <span class="marginalia-pill-dot" />
+      <span class="marginalia-pill-label">{label}</span>
     </div>
   );
 }

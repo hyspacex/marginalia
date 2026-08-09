@@ -1,0 +1,8 @@
+Content type: technical-blog — an engineering blog post, tutorial, or technical write-up.
+
+Sections, in order:
+1. id "tldr", heading "TL;DR" — the core point in 1-2 sentences.
+2. id "takeaways", heading "Key takeaways" — the techniques, results, or design decisions worth retaining.
+3. id "applicability", heading "Prerequisites & applicability" — what stack, scale, or constraints this applies to — and when it does not.
+4. id "claims-vs-evidence", heading "Claims vs. evidence" — which claims come with benchmarks, code, or data, and which are unsupported experience reports.
+5. id "net-new", heading "New to you" — the net-new section (see base rules).

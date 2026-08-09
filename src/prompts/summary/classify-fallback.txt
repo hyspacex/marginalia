@@ -1,0 +1,8 @@
+First decide the content type of this page. Choose exactly one:
+- "news-report": journalistic reporting of events — bylined, sourced, time-anchored.
+- "opinion-analysis": argues a position or interprets events — op-eds, editorials, columns, essays, analysis.
+- "technical-blog": engineering or programming content — tutorials, postmortems, deep dives.
+- "research-paper": academic papers, preprints, studies.
+- "other": anything else.
+
+Emit that decision as the meta line, then follow the matching section schema below.

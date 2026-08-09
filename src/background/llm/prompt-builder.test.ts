@@ -1,4 +1,4 @@
-import type { AnnotationRequest, ReaderProfile, SessionState } from '@/shared/types';
+import type { AnnotationRequest, ReaderProfile, SessionState, SummaryRequest } from '@/shared/types';
 import { buildAnnotationPrompt, buildProfileUpdatePrompt, buildSummaryPrompt } from './prompt-builder';
 
 const annotationRequest: AnnotationRequest = {
@@ -72,11 +72,58 @@ describe('prompt builder', () => {
     expect(prompt.user).toContain('Interactions: none');
   });
 
-  test('buildSummaryPrompt truncates long text', () => {
-    const prompt = buildSummaryPrompt('y'.repeat(9000), 'Summary title');
+  const summaryRequest: SummaryRequest = {
+    text: 'body',
+    title: 'Summary title',
+    url: 'https://example.com/article',
+    metadata: {
+      jsonLdTypes: ['NewsArticle'],
+      ogType: 'article',
+      host: 'example.com',
+      urlPath: '/article',
+      byline: 'A. Writer',
+      siteName: 'Example',
+      wordCount: 100,
+    },
+    contentType: 'news-report',
+    memoryContext: {},
+  };
 
-    expect(prompt.user).toContain('Title: Summary title');
-    expect(prompt.user).toContain('y'.repeat(8000));
-    expect(prompt.user).not.toContain('y'.repeat(8001));
+  test('buildSummaryPrompt uses the classified type template and truncates text', () => {
+    const prompt = buildSummaryPrompt({ ...summaryRequest, text: 'y'.repeat(13000) });
+
+    expect(prompt.system).toContain('Content type: news-report');
+    expect(prompt.system).toContain('fact-vs-framing');
+    expect(prompt.system).not.toContain('First decide the content type');
+    expect(prompt.user).toContain('"Summary title" (https://example.com/article)');
+    expect(prompt.user).toContain('y'.repeat(12000));
+    expect(prompt.user).not.toContain('y'.repeat(12001));
+  });
+
+  test('buildSummaryPrompt falls back to in-prompt classification with all schemas', () => {
+    const prompt = buildSummaryPrompt({ ...summaryRequest, contentType: null });
+
+    expect(prompt.system).toContain('First decide the content type');
+    expect(prompt.system).toContain('Content type: news-report');
+    expect(prompt.system).toContain('Content type: technical-blog');
+    expect(prompt.system).toContain('Content type: research-paper');
+    expect(prompt.system).toContain('Content type: opinion-analysis');
+    expect(prompt.system).toContain('Content type: other');
+  });
+
+  test('buildSummaryPrompt injects reader memory when provided', () => {
+    const prompt = buildSummaryPrompt({
+      ...summaryRequest,
+      memoryContext: { profile: 'reader profile', readingHistory: 'history' },
+    });
+
+    expect(prompt.system).toContain('<reader_profile>\nreader profile\n</reader_profile>');
+    expect(prompt.system).toContain('<reading_history>\nhistory\n</reading_history>');
+  });
+
+  test('buildSummaryPrompt omits reader context when memory is empty', () => {
+    const prompt = buildSummaryPrompt(summaryRequest);
+
+    expect(prompt.system).not.toContain('## Reader Context');
   });
 });

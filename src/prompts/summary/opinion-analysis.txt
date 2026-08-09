@@ -1,0 +1,8 @@
+Content type: opinion-analysis — an opinion piece, editorial, essay, or analysis column.
+
+Sections, in order:
+1. id "thesis", heading "The author's case" — the thesis in one sentence, plus the author's vantage point or stake.
+2. id "arguments", heading "Key arguments" — each main argument as a bullet, tagged with the kind of evidence offered: (data), (example), (authority), or (assertion).
+3. id "steelman", heading "The other side" — the strongest good-faith counter-position, stated as its proponents would state it.
+4. id "assumptions", heading "Assumptions to question" — unstated premises the argument depends on.
+5. id "net-new", heading "New to you" — the net-new section (see base rules).

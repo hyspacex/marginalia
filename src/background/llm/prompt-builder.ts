@@ -1,6 +1,28 @@
-import type { AnnotationRequest, ReaderProfile, SessionState, MemoryPromptFragment } from '@/shared/types';
+import type {
+  AnnotationRequest,
+  ContentType,
+  MemoryPromptFragment,
+  ReaderProfile,
+  SessionState,
+  SummaryRequest,
+} from '@/shared/types';
 import basePrompt from '@/prompts/base.txt?raw';
 import annotatePrompt from '@/prompts/annotate.txt?raw';
+import summaryBasePrompt from '@/prompts/summary/base.txt?raw';
+import summaryNewsPrompt from '@/prompts/summary/news-report.txt?raw';
+import summaryOpinionPrompt from '@/prompts/summary/opinion-analysis.txt?raw';
+import summaryTechnicalPrompt from '@/prompts/summary/technical-blog.txt?raw';
+import summaryResearchPrompt from '@/prompts/summary/research-paper.txt?raw';
+import summaryOtherPrompt from '@/prompts/summary/other.txt?raw';
+import summaryClassifyPrompt from '@/prompts/summary/classify-fallback.txt?raw';
+
+const SUMMARY_TEMPLATES: Record<ContentType, string> = {
+  'news-report': summaryNewsPrompt,
+  'opinion-analysis': summaryOpinionPrompt,
+  'technical-blog': summaryTechnicalPrompt,
+  'research-paper': summaryResearchPrompt,
+  'other': summaryOtherPrompt,
+};
 
 function buildMemorySection(memory: MemoryPromptFragment): string {
   const parts: string[] = [];
@@ -47,20 +69,15 @@ The profile JSON must have these fields:
   return { system, user };
 }
 
-export function buildSummaryPrompt(
-  text: string,
-  title: string,
-): { system: string; user: string } {
-  const system = `Summarize the following page for a reading graph. Focus on the key takeaways a reader should retain after a one-minute read. Output a JSON object with:
-- summary: a concise summary string formatted as 3-5 markdown bullet points, each on its own line starting with "- ", highlighting the most important takeaways, findings, or arguments
-- keyClaims: array of 2-5 key claims or arguments
-- topics: array of 3-7 topic tags (lowercase, hyphenated)
+export function buildSummaryPrompt(request: SummaryRequest): { system: string; user: string } {
+  const typeSection = request.contentType
+    ? SUMMARY_TEMPLATES[request.contentType]
+    : `${summaryClassifyPrompt}\n\n${(Object.keys(SUMMARY_TEMPLATES) as ContentType[])
+        .map((type) => SUMMARY_TEMPLATES[type])
+        .join('\n\n')}`;
 
-Keep the bullets crisp and information-dense. Avoid preambles, conclusions, or prose paragraphs.
-
-Output only the JSON object, nothing else.`;
-
-  const user = `Title: ${title}\n\n${text.slice(0, 8000)}`;
+  const system = `${summaryBasePrompt}\n\n## Section schema\n\n${typeSection}${buildMemorySection(request.memoryContext)}`;
+  const user = `Page: "${request.title}" (${request.url})\n\n<page_content>\n${request.text.slice(0, 12000)}\n</page_content>\n\nGenerate the structured summary as JSONL.`;
 
   return { system, user };
 }

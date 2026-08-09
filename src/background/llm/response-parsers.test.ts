@@ -1,5 +1,6 @@
+import type { ContentType, SummarySection } from '@/shared/types';
 import { ProviderError } from './provider';
-import { createAnnotationStreamParser, parsePageSummary, parseReaderProfile } from './response-parsers';
+import { createAnnotationStreamParser, createSummaryStreamParser, parseReaderProfile } from './response-parsers';
 
 describe('response parsers', () => {
   test('annotation parser flushes buffered lines and skips invalid entries', () => {
@@ -22,21 +23,66 @@ describe('response parsers', () => {
     expect(parser.flush()).toEqual([]);
   });
 
-  test('parsePageSummary extracts the first JSON object and validates shape', () => {
-    expect(parsePageSummary(
-      'prefix {"summary":"- one","keyClaims":["claim"],"topics":["topic-{x}"]} suffix',
-      'openai',
-    )).toEqual({
-      summary: '- one',
-      keyClaims: ['claim'],
-      topics: ['topic-{x}'],
+  function collectSummaryEvents() {
+    const events: {
+      metas: ContentType[];
+      sections: SummarySection[];
+      graphs: { keyClaims: string[]; topics: string[] }[];
+    } = { metas: [], sections: [], graphs: [] };
+
+    const parser = createSummaryStreamParser({
+      onMeta: (contentType) => events.metas.push(contentType),
+      onSection: (section) => events.sections.push(section),
+      onGraph: (graph) => events.graphs.push(graph),
     });
+
+    return { events, parser };
+  }
+
+  test('summary parser emits meta, sections, and graph across split deltas', () => {
+    const { events, parser } = collectSummaryEvents();
+
+    parser.push('{"kind":"meta","contentType":"news-report"}\n{"kind":"section","id":"what-');
+    parser.push('happened","heading":"What happened","markdown":"- a\\n- b"}\n');
+    parser.push('{"kind":"graph","keyClaims":["claim"],"topics":["topic-one"]}');
+    parser.flush();
+
+    expect(events.metas).toEqual(['news-report']);
+    expect(events.sections).toEqual([
+      { id: 'what-happened', heading: 'What happened', markdown: '- a\n- b' },
+    ]);
+    expect(events.graphs).toEqual([{ keyClaims: ['claim'], topics: ['topic-one'] }]);
   });
 
-  test('parsePageSummary throws for missing or invalid JSON', () => {
-    expect(() => parsePageSummary('no json here', 'anthropic')).toThrowError(ProviderError);
-    expect(() => parsePageSummary('{"summary":1,"keyClaims":[],"topics":[]}', 'anthropic')).toThrowError(ProviderError);
-    expect(() => parsePageSummary('{"summary":"ok"', 'anthropic')).toThrowError(ProviderError);
+  test('summary parser drops malformed lines, unknown kinds, and invalid values', () => {
+    const { events, parser } = collectSummaryEvents();
+
+    parser.push('not json\n');
+    parser.push('{"kind":"meta","contentType":"not-a-type"}\n');
+    parser.push('{"kind":"mystery","id":"x"}\n');
+    parser.push('{"kind":"section","id":"empty","heading":"Empty","markdown":"  "}\n');
+    parser.push('{"kind":"graph","keyClaims":["ok"],"topics":[1]}\n');
+    parser.push('{"kind":"section","id":"ok","heading":"OK","markdown":"- fine"}\n');
+    parser.flush();
+
+    expect(events.metas).toEqual([]);
+    expect(events.graphs).toEqual([]);
+    expect(events.sections).toEqual([{ id: 'ok', heading: 'OK', markdown: '- fine' }]);
+  });
+
+  test('summary parser recovers a final line missing its newline via flush', () => {
+    const { events, parser } = collectSummaryEvents();
+
+    parser.push('{"kind":"graph","keyClaims":["tail claim"],"topics":["tail-topic"]}');
+    expect(events.graphs).toEqual([]);
+    parser.flush();
+    expect(events.graphs).toEqual([{ keyClaims: ['tail claim'], topics: ['tail-topic'] }]);
+
+    // A truncated final object is dropped, not thrown.
+    const second = collectSummaryEvents();
+    second.parser.push('{"kind":"graph","keyClaims":["cut off"');
+    second.parser.flush();
+    expect(second.events.graphs).toEqual([]);
   });
 
   test('parseReaderProfile validates structure and stamps updatedAt', () => {

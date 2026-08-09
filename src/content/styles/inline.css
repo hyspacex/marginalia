@@ -1,44 +1,110 @@
 :host {
   all: initial;
+
+  /* Design tokens */
+  --m-surface: rgba(255, 255, 255, 0.9);
+  --m-surface-raised: rgba(248, 250, 252, 0.85);
+  --m-border: rgba(15, 23, 42, 0.08);
+  --m-border-strong: rgba(15, 23, 42, 0.12);
+  --m-text: #334155;
+  --m-text-strong: #0f172a;
+  --m-text-muted: #7c8598;
+  --m-accent: #4f46e5;
+  --m-accent-strong: #4338ca;
+  --m-accent-soft: rgba(79, 70, 229, 0.09);
+  --m-accent-border: rgba(79, 70, 229, 0.25);
+  --m-danger: #b91c1c;
+  --m-danger-soft: rgba(185, 28, 28, 0.08);
+  --m-shadow:
+    0 0 0 1px var(--m-border),
+    0 2px 6px rgba(15, 23, 42, 0.05),
+    0 16px 40px -12px rgba(15, 23, 42, 0.22);
+  --m-shadow-soft:
+    0 0 0 1px var(--m-border),
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 6px 18px -6px rgba(15, 23, 42, 0.16);
+  --m-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --m-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Hover Card */
-.marginalia-card {
-  position: fixed;
-  z-index: 2147483647;
-  max-width: 360px;
-  padding: 12px 16px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #334155;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 150ms ease, transform 150ms ease;
-  pointer-events: auto;
+@media (prefers-color-scheme: dark) {
+  :host {
+    --m-surface: rgba(24, 27, 35, 0.92);
+    --m-surface-raised: rgba(255, 255, 255, 0.05);
+    --m-border: rgba(255, 255, 255, 0.09);
+    --m-border-strong: rgba(255, 255, 255, 0.14);
+    --m-text: #cbd5e1;
+    --m-text-strong: #f1f5f9;
+    --m-text-muted: #8b95a7;
+    --m-accent: #a5b4fc;
+    --m-accent-strong: #c7d2fe;
+    --m-accent-soft: rgba(129, 140, 248, 0.15);
+    --m-accent-border: rgba(129, 140, 248, 0.35);
+    --m-danger: #fca5a5;
+    --m-danger-soft: rgba(248, 113, 113, 0.12);
+    --m-shadow:
+      0 0 0 1px var(--m-border),
+      0 2px 6px rgba(0, 0, 0, 0.3),
+      0 16px 40px -12px rgba(0, 0, 0, 0.6);
+    --m-shadow-soft:
+      0 0 0 1px var(--m-border),
+      0 1px 3px rgba(0, 0, 0, 0.3),
+      0 6px 18px -6px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+.marginalia-card,
+.marginalia-summary,
+.marginalia-pill {
+  font-family: var(--m-font);
+  color: var(--m-text);
+  background: var(--m-surface);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
   box-sizing: border-box;
 }
 
 .marginalia-card *,
 .marginalia-card *::before,
-.marginalia-card *::after {
+.marginalia-card *::after,
+.marginalia-summary *,
+.marginalia-summary *::before,
+.marginalia-summary *::after {
   box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------- hover card */
+
+.marginalia-card {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: 360px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 14px;
+  box-shadow: var(--m-shadow-soft);
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition: opacity 180ms var(--m-ease), transform 220ms var(--m-ease);
+  pointer-events: auto;
 }
 
 .marginalia-card.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 .marginalia-card-label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
+  letter-spacing: 0.08em;
+  color: var(--m-text-muted);
   margin-bottom: 6px;
 }
 
@@ -52,7 +118,7 @@
 
 .marginalia-card-body strong {
   font-weight: 600;
-  color: #1e293b;
+  color: var(--m-text-strong);
 }
 
 .marginalia-card-body em {
@@ -61,22 +127,22 @@
 
 .marginalia-card-body code {
   font-size: 12px;
-  padding: 1px 4px;
-  background: #f1f5f9;
-  border-radius: 3px;
+  padding: 1px 5px;
+  background: var(--m-surface-raised);
+  border: 1px solid var(--m-border);
+  border-radius: 5px;
 }
 
-/* Arrow */
 .marginalia-card-arrow {
   position: absolute;
   width: 8px;
   height: 8px;
-  background: #fff;
+  background: inherit;
   transform: rotate(45deg);
-  box-shadow: -1px -1px 2px rgba(0, 0, 0, 0.04);
 }
 
-/* Floating Pill */
+/* ---------------------------------------------------------------- pill */
+
 .marginalia-pill {
   position: fixed;
   bottom: 24px;
@@ -85,78 +151,234 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  padding: 9px 16px 9px 13px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: var(--m-shadow-soft);
   font-size: 12px;
-  font-weight: 500;
-  color: #475569;
+  font-weight: 550;
+  letter-spacing: 0.01em;
   cursor: pointer;
   user-select: none;
-  transition: box-shadow 0.15s, background 0.15s;
-  box-sizing: border-box;
+  animation: marginalia-rise-in 360ms var(--m-ease-out) both;
+  transition:
+    transform 200ms var(--m-ease),
+    box-shadow 200ms var(--m-ease),
+    color 200ms ease;
 }
 
 .marginalia-pill:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  background: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: var(--m-shadow);
 }
 
-.marginalia-pill-icon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.marginalia-pill:active {
+  transform: translateY(0) scale(0.97);
 }
 
-.marginalia-pill.loading {
-  color: #94a3b8;
+.marginalia-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--m-accent);
+  transition: background 250ms ease, box-shadow 250ms ease;
 }
 
-.marginalia-pill.loading .marginalia-pill-icon {
-  animation: marginalia-pulse 1.5s ease-in-out infinite;
+.marginalia-pill.is-busy .marginalia-pill-dot {
+  animation: marginalia-breathe 1.4s ease-in-out infinite;
 }
 
-@keyframes marginalia-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+.marginalia-pill.is-busy {
+  color: var(--m-text-muted);
 }
 
-.marginalia-pill.hidden-state {
-  opacity: 0.6;
+.marginalia-pill.is-off {
+  color: var(--m-text-muted);
 }
 
-/* Summary Card */
+.marginalia-pill.is-off .marginalia-pill-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--m-text-muted);
+}
+
+@keyframes marginalia-breathe {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes marginalia-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------------------------------------------------------------- summary card */
+
 .marginalia-summary {
   position: fixed;
-  bottom: 64px;
+  bottom: 68px;
   right: 24px;
   z-index: 2147483647;
-  max-width: 360px;
-  padding: 14px 18px;
-  padding-right: 32px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.06);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  width: min(420px, calc(100vw - 48px));
+  max-height: 70vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 18px;
+  padding-right: 34px;
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--m-shadow);
   font-size: 13px;
   line-height: 1.6;
-  color: #334155;
-  animation: marginalia-summary-in 200ms ease-out;
-  box-sizing: border-box;
+  animation: marginalia-summary-in 340ms var(--m-ease-out) both;
+  scrollbar-width: thin;
+  scrollbar-color: var(--m-border-strong) transparent;
 }
 
-.marginalia-summary *,
-.marginalia-summary *::before,
-.marginalia-summary *::after {
-  box-sizing: border-box;
+.marginalia-summary::-webkit-scrollbar {
+  width: 8px;
+}
+
+.marginalia-summary::-webkit-scrollbar-thumb {
+  background: var(--m-border-strong);
+  border-radius: 999px;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.marginalia-summary::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 @keyframes marginalia-summary-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.marginalia-summary-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--m-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0;
+  transition: color 150ms ease, background 150ms ease, transform 150ms var(--m-ease);
+}
+
+.marginalia-summary-close:hover {
+  color: var(--m-text-strong);
+  background: var(--m-surface-raised);
+  transform: scale(1.08);
+}
+
+.marginalia-summary-close:active {
+  transform: scale(0.94);
+}
+
+.marginalia-summary-label {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--m-text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.marginalia-summary-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  background: var(--m-accent-soft);
+  color: var(--m-accent);
+  animation: marginalia-fade-in 250ms ease both;
+}
+
+.marginalia-summary-badge.is-news-report {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0369a1;
+}
+
+.marginalia-summary-badge.is-opinion-analysis {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.marginalia-summary-badge.is-technical-blog {
+  background: rgba(5, 150, 105, 0.1);
+  color: #047857;
+}
+
+.marginalia-summary-badge.is-research-paper {
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+}
+
+@media (prefers-color-scheme: dark) {
+  .marginalia-summary-badge.is-news-report {
+    background: rgba(56, 189, 248, 0.14);
+    color: #7dd3fc;
+  }
+
+  .marginalia-summary-badge.is-opinion-analysis {
+    background: rgba(251, 191, 36, 0.14);
+    color: #fcd34d;
+  }
+
+  .marginalia-summary-badge.is-technical-blog {
+    background: rgba(52, 211, 153, 0.14);
+    color: #6ee7b7;
+  }
+
+  .marginalia-summary-badge.is-research-paper {
+    background: rgba(167, 139, 250, 0.16);
+    color: #c4b5fd;
+  }
+}
+
+.marginalia-summary-section {
+  animation: marginalia-section-in 320ms var(--m-ease-out) both;
+}
+
+.marginalia-summary-section + .marginalia-summary-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--m-border);
+}
+
+@keyframes marginalia-section-in {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -167,42 +389,69 @@
   }
 }
 
-.marginalia-summary-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: none;
-  color: #94a3b8;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  padding: 0;
+@keyframes marginalia-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.marginalia-summary-close:hover {
-  color: #475569;
-  background: #f1f5f9;
-}
-
-.marginalia-summary-label {
-  font-size: 10px;
-  font-weight: 600;
+.marginalia-summary-heading {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--m-accent);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
-  margin-bottom: 8px;
+  letter-spacing: 0.07em;
+  margin-bottom: 5px;
+}
+
+.marginalia-summary-error {
+  color: var(--m-danger);
+  background: var(--m-danger-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  animation: marginalia-fade-in 250ms ease both;
+}
+
+.marginalia-summary-body .marginalia-summary-skeleton {
+  margin-top: 14px;
+}
+
+.marginalia-summary-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--m-border);
+}
+
+.marginalia-quickadd-btn {
+  border: 1px solid var(--m-accent-border);
+  background: transparent;
+  color: var(--m-accent);
+  font-family: var(--m-font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 180ms ease, transform 180ms var(--m-ease);
+}
+
+.marginalia-quickadd-btn:hover {
+  background: var(--m-accent-soft);
+  transform: translateY(-1px);
+}
+
+.marginalia-quickadd-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.marginalia-quickadd-on {
+  font-size: 11px;
+  color: var(--m-text-muted);
 }
 
 .marginalia-summary-text {
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .marginalia-summary-text p,
@@ -219,19 +468,32 @@
 
 .marginalia-summary-text ul,
 .marginalia-summary-text ol {
-  padding-left: 18px;
+  padding-left: 16px;
 }
 
 .marginalia-summary-text li + li {
-  margin-top: 6px;
+  margin-top: 5px;
+}
+
+.marginalia-summary-text li::marker {
+  color: var(--m-text-muted);
 }
 
 .marginalia-summary-text strong {
   font-weight: 600;
-  color: #0f172a;
+  color: var(--m-text-strong);
 }
 
-/* Skeleton loading */
+.marginalia-summary-text code {
+  font-size: 12px;
+  padding: 1px 5px;
+  background: var(--m-surface-raised);
+  border: 1px solid var(--m-border);
+  border-radius: 5px;
+}
+
+/* ---------------------------------------------------------------- skeleton */
+
 .marginalia-summary-skeleton {
   display: flex;
   flex-direction: column;
@@ -239,11 +501,16 @@
 }
 
 .marginalia-skeleton-line {
-  height: 12px;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  height: 11px;
+  background: linear-gradient(
+    90deg,
+    var(--m-surface-raised) 25%,
+    var(--m-border) 50%,
+    var(--m-surface-raised) 75%
+  );
   background-size: 200% 100%;
-  border-radius: 4px;
-  animation: marginalia-shimmer 1.5s ease-in-out infinite;
+  border-radius: 999px;
+  animation: marginalia-shimmer 1.6s ease-in-out infinite;
 }
 
 .marginalia-skeleton-line.short {
@@ -253,4 +520,20 @@
 @keyframes marginalia-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .marginalia-card,
+  .marginalia-pill,
+  .marginalia-pill-dot,
+  .marginalia-summary,
+  .marginalia-summary-section,
+  .marginalia-summary-badge,
+  .marginalia-summary-error,
+  .marginalia-skeleton-line {
+    animation: none;
+    transition: none;
+  }
 }

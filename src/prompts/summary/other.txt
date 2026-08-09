@@ -1,0 +1,7 @@
+Content type: other — a general article or page.
+
+Sections, in order:
+1. id "key-points", heading "Key points" — the 3-4 most important things in the piece.
+2. id "why-it-matters", heading "Why it matters" — 1-2 bullets on why this deserves the reader's attention.
+3. id "net-new", heading "New to you" — the net-new section (see base rules).
+4. id "questions", heading "Questions to ask" — 2-3 article-specific critical questions worth pursuing.

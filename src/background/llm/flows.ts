@@ -1,18 +1,21 @@
 import type {
   Annotation,
   AnnotationRequest,
+  ContentType,
   ModelOption,
-  PageSummary,
+  PageSummaryV2,
   ProviderConfig,
   ProviderConfigInput,
   ReaderProfile,
   SessionState,
+  SummaryRequest,
+  SummarySection,
   TokenUsage,
 } from '@/shared/types';
 import { buildAnnotationPrompt, buildProfileUpdatePrompt, buildSummaryPrompt } from './prompt-builder';
 import { getProviderDescriptor } from './provider-registry';
 import { ProviderError } from './provider';
-import { createAnnotationStreamParser, parsePageSummary, parseReaderProfile } from './response-parsers';
+import { createAnnotationStreamParser, createSummaryStreamParser, parseReaderProfile } from './response-parsers';
 
 interface LlmServiceDeps {
   fetch?: typeof fetch;
@@ -25,7 +28,7 @@ export interface StreamAnnotationsResult {
 }
 
 const ANNOTATION_MAX_OUTPUT_TOKENS = 4096;
-const SUMMARY_MAX_OUTPUT_TOKENS = 1024;
+const SUMMARY_MAX_OUTPUT_TOKENS = 2048;
 const PROFILE_MAX_OUTPUT_TOKENS = 2048;
 
 export function createLlmService(deps: LlmServiceDeps = {}) {
@@ -90,25 +93,59 @@ export function createLlmService(deps: LlmServiceDeps = {}) {
       }
     },
 
-    async generatePageSummary(
-      text: string,
-      title: string,
+    async streamPageSummary(
+      request: SummaryRequest,
       configInput: ProviderConfigInput | ProviderConfig,
-    ): Promise<PageSummary> {
+      handlers: {
+        onMeta?: (contentType: ContentType) => void;
+        onSection?: (section: SummarySection) => void;
+      } = {},
+    ): Promise<{ summary: PageSummaryV2; usage: TokenUsage }> {
       const { config, transport } = resolve(configInput);
       ensureConfigured(config);
 
-      const { system, user } = buildSummaryPrompt(text, title);
+      const { system, user } = buildSummaryPrompt(request);
+
+      let contentType: ContentType = request.contentType ?? 'other';
+      const sections: SummarySection[] = [];
+      let keyClaims: string[] = [];
+      let topics: string[] = [];
+
+      const parser = createSummaryStreamParser({
+        onMeta: (type) => {
+          contentType = type;
+          handlers.onMeta?.(type);
+        },
+        onSection: (section) => {
+          sections.push(section);
+          handlers.onSection?.(section);
+        },
+        onGraph: (graph) => {
+          keyClaims = graph.keyClaims;
+          topics = graph.topics;
+        },
+      });
 
       try {
-        const result = await transport.generateText({
+        const result = await transport.streamText({
           config,
           systemPrompt: system,
           userPrompt: user,
           maxOutputTokens: SUMMARY_MAX_OUTPUT_TOKENS,
+        }, (delta) => {
+          parser.push(delta);
         });
 
-        return parsePageSummary(result.text, config.providerId);
+        parser.flush();
+
+        if (sections.length === 0) {
+          throw new ProviderError(config.providerId, 'protocol', 'Summary stream contained no sections');
+        }
+
+        return {
+          summary: { version: 2, contentType, sections, keyClaims, topics },
+          usage: result.usage,
+        };
       } catch (error) {
         throw toProviderError(error, config);
       }

@@ -1,0 +1,7 @@
+Content type: research-paper — an academic paper, preprint, or study write-up.
+
+Sections, in order:
+1. id "contribution", heading "Core contribution" — what is new, in 1-2 sentences.
+2. id "method", heading "Method" — how they did it, in 2-3 bullets.
+3. id "limitations", heading "Limitations" — limitations the authors admit, plus obvious ones they do not.
+4. id "net-new", heading "New to you" — the net-new section (see base rules).

@@ -49,6 +49,9 @@ export interface ReaderProfile {
   updatedAt: string;
 }
 
+// `summary` stays a flattened markdown string so entries written before the
+// sectioned-summary redesign coexist with new ones; `sections`/`contentType`
+// are optional non-indexed additions (no Dexie schema bump required).
 export interface ReadingGraphEntry {
   id?: number;
   url: string;
@@ -60,20 +63,61 @@ export interface ReadingGraphEntry {
   keyClaims: string[];
   topics: string[];
   savedAnnotations: Annotation[];
+  contentType?: ContentType;
+  sections?: SummarySection[];
 }
 
-export interface PageSummary {
-  summary: string;
+export type ContentType =
+  | 'news-report'
+  | 'opinion-analysis'
+  | 'technical-blog'
+  | 'research-paper'
+  | 'other';
+
+export interface SummarySection {
+  id: string;       // stable slug, e.g. 'what-happened', 'net-new'
+  heading: string;  // display label
+  markdown: string; // bullet body
+}
+
+export interface PageSummaryV2 {
+  version: 2;
+  contentType: ContentType;
+  sections: SummarySection[];
   keyClaims: string[];
   topics: string[];
 }
+
+// Page signals collected in the content script (needs live DOM) and classified
+// deterministically in the service worker; null classification falls back to
+// in-prompt LLM classification.
+export interface PageMetadata {
+  jsonLdTypes: string[];
+  ogType: string | null;
+  host: string;
+  urlPath: string;
+  byline: string | null;
+  siteName: string | null;
+  wordCount: number;
+}
+
+export interface SummaryRequest {
+  text: string;
+  title: string;
+  url: string;
+  metadata: PageMetadata;
+  contentType: ContentType | null;
+  memoryContext: MemoryPromptFragment;
+}
+
+export type SessionMode = 'full' | 'summary-only';
 
 export interface SessionState {
   tabId: number;
   url: string;
   title: string;
   pageContent: string;
-  pageSummary: PageSummary | null;
+  pageSummary: PageSummaryV2 | null;
   annotations: Annotation[];
   interactions: UserInteraction[];
   startedAt: number;
@@ -95,7 +139,7 @@ export interface ModelOption {
   costPer1kOutput: number | null;
 }
 
-export type ProviderId = 'anthropic' | 'openai' | 'openrouter';
+export type ProviderId = 'anthropic' | 'openai' | 'openrouter' | 'local';
 
 export type ProviderModelMode = 'catalog' | 'custom';
 
@@ -128,11 +172,13 @@ export type RequestMessage =
   | { type: 'GET_SESSION'; payload: { tabId: number } }
   | { type: 'END_SESSION'; payload: { tabId: number } }
   | { type: 'LIST_MODELS'; payload: { config: ProviderConfigInput } }
-  | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfigInput } };
+  | { type: 'TEST_CONNECTION'; payload: { config: ProviderConfigInput } }
+  | { type: 'ADD_AUTO_SITE'; payload: { hostname: string } };
 
-// Message protocol — content script messages (popup → content script)
+// Message protocol — messages to the content script
 export type ContentMessage =
-  | { type: 'TOGGLE_ANNOTATIONS' };
+  | { type: 'TOGGLE_ANNOTATIONS' }
+  | { type: 'PAGE_NAVIGATED'; payload: { url: string } };
 
 export type ResponseMessage =
   | { type: 'ANNOTATIONS_READY'; payload: { annotations: Annotation[]; usage: TokenUsage } }
@@ -143,8 +189,17 @@ export type ResponseMessage =
 
 // Port message types for streaming
 export type PortMessage =
-  | { type: 'START_ANNOTATE'; payload: { url: string; title: string; text: string } }
+  | { type: 'START_ANNOTATE'; payload: {
+      url: string;
+      title: string;
+      text: string;
+      metadata: PageMetadata;
+      mode: SessionMode;
+    } }
   | { type: 'ANNOTATION_CHUNK'; payload: { annotation: Annotation } }
-  | { type: 'PAGE_SUMMARY'; payload: { summary: string } }
+  | { type: 'SUMMARY_META'; payload: { contentType: ContentType } }
+  | { type: 'SUMMARY_SECTION'; payload: { section: SummarySection } }
+  | { type: 'SUMMARY_DONE'; payload: { keyClaims: string[]; topics: string[] } }
+  | { type: 'SUMMARY_ERROR'; payload: { message: string } }
   | { type: 'STREAM_DONE'; payload: { usage: TokenUsage } }
   | { type: 'STREAM_ERROR'; payload: { message: string; code: string } };

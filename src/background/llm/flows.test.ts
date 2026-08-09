@@ -1,4 +1,4 @@
-import type { AnnotationRequest, ProviderConfig, ReaderProfile, SessionState } from '@/shared/types';
+import type { AnnotationRequest, ProviderConfig, ReaderProfile, SessionState, SummaryRequest, SummarySection } from '@/shared/types';
 import { createLlmService } from './flows';
 import { ProviderError } from './provider';
 
@@ -124,30 +124,67 @@ describe('createLlmService', () => {
     ]);
   });
 
-  test('validates parsed summary JSON', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => createJsonResponse({
-      output_text: 'prefix {"summary":"- one","keyClaims":["claim"],"topics":["topic-one"]} suffix',
-      usage: { input_tokens: 8, output_tokens: 3 },
-    }));
+  function sseTextDelta(text: string): string {
+    return `data: ${JSON.stringify({ type: 'content_block_delta', delta: { text } })}\n\n`;
+  }
+
+  const summaryRequest: SummaryRequest = {
+    text: 'body',
+    title: 'title',
+    url: 'https://example.com/article',
+    metadata: {
+      jsonLdTypes: ['NewsArticle'],
+      ogType: 'article',
+      host: 'example.com',
+      urlPath: '/article',
+      byline: 'A. Writer',
+      siteName: 'Example',
+      wordCount: 100,
+    },
+    contentType: 'news-report',
+    memoryContext: {},
+  };
+
+  test('streams structured summary sections and assembles the result', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => createSseResponse([
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":8}}}\n\n',
+      sseTextDelta('{"kind":"meta","contentType":"news-report"}\n{"kind":"section","id":"what-'),
+      sseTextDelta('happened","heading":"What happened","markdown":"- x"}\n'),
+      sseTextDelta('{"kind":"graph","keyClaims":["claim"],"topics":["topic-one"]}'),
+      'data: {"type":"message_delta","usage":{"output_tokens":3}}\n\n',
+    ]));
 
     const service = createLlmService({ fetch: fetchMock });
-    await expect(service.generatePageSummary('body', 'title', openAiConfig)).resolves.toEqual({
-      summary: '- one',
-      keyClaims: ['claim'],
-      topics: ['topic-one'],
+    const streamedSections: SummarySection[] = [];
+
+    const result = await service.streamPageSummary(summaryRequest, anthropicConfig, {
+      onSection: (section) => streamedSections.push(section),
     });
+
+    expect(result).toEqual({
+      summary: {
+        version: 2,
+        contentType: 'news-report',
+        sections: [{ id: 'what-happened', heading: 'What happened', markdown: '- x' }],
+        keyClaims: ['claim'],
+        topics: ['topic-one'],
+      },
+      usage: { inputTokens: 8, outputTokens: 3 },
+    });
+    expect(streamedSections).toHaveLength(1);
   });
 
-  test('throws protocol errors for invalid summary JSON', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => createJsonResponse({
-      output_text: 'not json',
-      usage: { input_tokens: 8, output_tokens: 3 },
-    }));
+  test('throws a protocol error when the summary stream contains no sections', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => createSseResponse([
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":8}}}\n\n',
+      sseTextDelta('not json at all\n'),
+      'data: {"type":"message_delta","usage":{"output_tokens":3}}\n\n',
+    ]));
 
     const service = createLlmService({ fetch: fetchMock });
 
-    await expect(service.generatePageSummary('body', 'title', openAiConfig)).rejects.toMatchObject<Partial<ProviderError>>({
-      providerId: 'openai',
+    await expect(service.streamPageSummary(summaryRequest, anthropicConfig)).rejects.toMatchObject<Partial<ProviderError>>({
+      providerId: 'anthropic',
       code: 'protocol',
     });
   });

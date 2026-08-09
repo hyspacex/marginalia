@@ -4,17 +4,17 @@ import { profileManager } from './profile-manager';
 import { readingGraph } from './reading-graph';
 import { sessionTracker } from './session-tracker';
 
-function extractTopicsFromText(text: string): string[] {
-  // Simple keyword extraction: find common topic-like words
-  const words = text.toLowerCase().split(/\W+/).filter((w) => w.length > 4);
-  const freq = new Map<string, number>();
-  for (const w of words) {
-    freq.set(w, (freq.get(w) || 0) + 1);
-  }
-  return Array.from(freq.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([word]) => word);
+// Match against the stored topic vocabulary so the query and the Dexie *topics
+// index share the same tag set — free-text keyword extraction never intersects
+// the LLM's hyphenated tags.
+export function selectRelevantStoredTopics(text: string, vocabulary: string[]): string[] {
+  const lower = text.toLowerCase();
+  return vocabulary
+    .filter((tag) => {
+      const words = tag.split('-').filter((w) => w.length > 3);
+      return words.length > 0 && words.every((w) => lower.includes(w));
+    })
+    .slice(0, 15);
 }
 
 function formatReadingHistory(entries: ReadingGraphEntry[]): string {
@@ -63,7 +63,8 @@ export async function getMemoryContext(
   // Layer 2: Reading graph — find related entries
   try {
     const domain = new URL(url).hostname;
-    const topics = extractTopicsFromText(text);
+    const vocabulary = await readingGraph.getAllTopics();
+    const topics = selectRelevantStoredTopics(text, vocabulary);
 
     const [topicMatches, domainMatches] = await Promise.all([
       readingGraph.findByTopics(topics, 3),
