@@ -54,6 +54,15 @@ describe('response parsers', () => {
     expect(events.graphs).toEqual([{ keyClaims: ['claim'], topics: ['topic-one'] }]);
   });
 
+  test('summary parser accepts the discussion-thread and reference-docs meta types', () => {
+    const { events, parser } = collectSummaryEvents();
+
+    parser.push('{"kind":"meta","contentType":"discussion-thread"}\n');
+    parser.push('{"kind":"meta","contentType":"reference-docs"}\n');
+
+    expect(events.metas).toEqual(['discussion-thread', 'reference-docs']);
+  });
+
   test('summary parser drops malformed lines, unknown kinds, and invalid values', () => {
     const { events, parser } = collectSummaryEvents();
 

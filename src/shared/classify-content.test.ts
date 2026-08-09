@@ -44,6 +44,49 @@ describe('classifyContent', () => {
     expect(classifyContent(meta({ jsonLdTypes: ['TechArticle'] }))).toBe('technical-blog');
   });
 
+  test('classifies discussion hosts and forum/Q&A JSON-LD as discussion-thread', () => {
+    expect(classifyContent(meta({ host: 'news.ycombinator.com', urlPath: '/item' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'old.reddit.com', urlPath: '/r/programming/comments/abc' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'stackoverflow.com', urlPath: '/questions/1234/how' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'unix.stackexchange.com', urlPath: '/questions/1' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ jsonLdTypes: ['DiscussionForumPosting'] }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ jsonLdTypes: ['QAPage'] }))).toBe('discussion-thread');
+  });
+
+  test('classifies GitHub issues, discussions, and PRs as discussion-thread, but not repo pages', () => {
+    expect(classifyContent(meta({ host: 'github.com', urlPath: '/owner/repo/issues/42' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'github.com', urlPath: '/owner/repo/discussions/7' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'github.com', urlPath: '/owner/repo/pull/99' }))).toBe('discussion-thread');
+    expect(classifyContent(meta({ host: 'github.com', urlPath: '/owner/repo' }))).toBeNull();
+  });
+
+  test('discussion host wins over an opinion-looking forum path', () => {
+    expect(classifyContent(meta({
+      host: 'www.reddit.com',
+      urlPath: '/r/opinions/comments/abc/take',
+    }))).toBe('discussion-thread');
+  });
+
+  test('classifies documentation hosts and paths as reference-docs', () => {
+    expect(classifyContent(meta({ host: 'en.wikipedia.org', urlPath: '/wiki/Topic' }))).toBe('reference-docs');
+    expect(classifyContent(meta({ host: 'developer.mozilla.org', urlPath: '/en-US/docs/Web' }))).toBe('reference-docs');
+    expect(classifyContent(meta({ host: 'docs.python.org', urlPath: '/3/library/asyncio.html' }))).toBe('reference-docs');
+    expect(classifyContent(meta({ host: 'myproject.readthedocs.io', urlPath: '/en/stable/' }))).toBe('reference-docs');
+    expect(classifyContent(meta({ host: 'example.com', urlPath: '/docs/getting-started' }))).toBe('reference-docs');
+  });
+
+  test('reference-docs wins over TechArticle JSON-LD on doc sites', () => {
+    expect(classifyContent(meta({
+      host: 'developer.mozilla.org',
+      urlPath: '/en-US/docs/Web/API',
+      jsonLdTypes: ['TechArticle'],
+    }))).toBe('reference-docs');
+  });
+
+  test('does not classify docs.google.com documents as reference-docs', () => {
+    expect(classifyContent(meta({ host: 'docs.google.com', urlPath: '/document/d/abc/edit' }))).toBeNull();
+  });
+
   test('falls back to news-report for og:type article with byline and site name', () => {
     expect(classifyContent(meta({
       ogType: 'article',

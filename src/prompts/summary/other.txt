@@ -1,7 +1,9 @@
-Content type: other — a general article or page.
+Content type: other — a page that fits none of the named types (e.g. product page, release notes, review, interview, personal essay, recipe, changelog, event announcement).
 
-Sections, in order:
-1. id "key-points", heading "Key points" — the 3-4 most important things in the piece.
-2. id "why-it-matters", heading "Why it matters" — 1-2 bullets on why this deserves the reader's attention.
-3. id "net-new", heading "New to you" — the net-new section (see base rules).
-4. id "questions", heading "Questions to ask" — 2-3 article-specific critical questions worth pursuing.
+No fixed schema: design 3-5 sections that best serve a reader of THIS page.
+
+- Choose headings the way a sharp editor would — specific to the page's genre, not generic. "What changed" and "Breaking changes" for release notes; "Verdict" and "Who it's for" for a review; "The claim" and "What it costs" for a product page; "Best quotes" for an interview.
+- Lead with the section a busy reader needs first.
+- Give each section an id that is a short lowercase hyphenated slug of its heading.
+- Include exactly one net-new section (id "net-new", heading "New to you" — see base rules), placed wherever it fits the flow.
+- Keep the JSONL line format and bullet discipline from the base rules; only the section choice is yours.

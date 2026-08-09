@@ -39,6 +39,8 @@ const CONTENT_TYPES = new Set<string>([
   'opinion-analysis',
   'technical-blog',
   'research-paper',
+  'discussion-thread',
+  'reference-docs',
   'other',
 ]);
 

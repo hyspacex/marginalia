@@ -1,0 +1,7 @@
+Content type: reference-docs — documentation, an API reference, an encyclopedia entry, or another lookup-oriented page. The reader wants working knowledge, not an argument analysis.
+
+Sections, in order:
+1. id "overview", heading "What this covers" — the subject and its scope in 1-2 sentences: what it is, what it is for.
+2. id "essentials", heading "The essentials" — the facts, behaviors, parameters, or API surface most worth retaining. Prefer the concrete (defaults, signatures, key values) over restated prose.
+3. id "gotchas", heading "Gotchas & caveats" — pitfalls, version or compatibility constraints, edge cases, deprecations, or common misconceptions the page warns about or implies.
+4. id "net-new", heading "New to you" — the net-new section (see base rules).

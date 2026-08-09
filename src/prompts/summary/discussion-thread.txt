@@ -1,0 +1,8 @@
+Content type: discussion-thread — a forum thread, Q&A page, or comment discussion (e.g. Hacker News, Reddit, Stack Overflow, a GitHub issue). Summarize the conversation, not just the original post. On Q&A pages, treat the accepted or top answer as the consensus core.
+
+Sections, in order:
+1. id "topic", heading "The topic" — what the thread is about and what prompted it, in 1-2 sentences.
+2. id "consensus", heading "Where people agree" — points of broad agreement, noting how strong the consensus reads (near-unanimous vs. plurality).
+3. id "disagreements", heading "Where people split" — the main fault lines, each side in its strongest form. Skip if the thread has no real disagreement.
+4. id "insights", heading "Sharpest insights" — the most valuable individual contributions: firsthand experience, expert detail, corrections or counterexamples to the original post.
+5. id "net-new", heading "New to you" — the net-new section (see base rules).

@@ -346,6 +346,16 @@
   color: #6d28d9;
 }
 
+.marginalia-summary-badge.is-discussion-thread {
+  background: rgba(225, 29, 72, 0.1);
+  color: #be123c;
+}
+
+.marginalia-summary-badge.is-reference-docs {
+  background: rgba(71, 85, 105, 0.12);
+  color: #475569;
+}
+
 @media (prefers-color-scheme: dark) {
   .marginalia-summary-badge.is-news-report {
     background: rgba(56, 189, 248, 0.14);
@@ -365,6 +375,16 @@
   .marginalia-summary-badge.is-research-paper {
     background: rgba(167, 139, 250, 0.16);
     color: #c4b5fd;
+  }
+
+  .marginalia-summary-badge.is-discussion-thread {
+    background: rgba(251, 113, 133, 0.14);
+    color: #fda4af;
+  }
+
+  .marginalia-summary-badge.is-reference-docs {
+    background: rgba(148, 163, 184, 0.16);
+    color: #cbd5e1;
   }
 }
 

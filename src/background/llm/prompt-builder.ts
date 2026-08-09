@@ -13,6 +13,8 @@ import summaryNewsPrompt from '@/prompts/summary/news-report.txt?raw';
 import summaryOpinionPrompt from '@/prompts/summary/opinion-analysis.txt?raw';
 import summaryTechnicalPrompt from '@/prompts/summary/technical-blog.txt?raw';
 import summaryResearchPrompt from '@/prompts/summary/research-paper.txt?raw';
+import summaryDiscussionPrompt from '@/prompts/summary/discussion-thread.txt?raw';
+import summaryDocsPrompt from '@/prompts/summary/reference-docs.txt?raw';
 import summaryOtherPrompt from '@/prompts/summary/other.txt?raw';
 import summaryClassifyPrompt from '@/prompts/summary/classify-fallback.txt?raw';
 
@@ -21,6 +23,8 @@ const SUMMARY_TEMPLATES: Record<ContentType, string> = {
   'opinion-analysis': summaryOpinionPrompt,
   'technical-blog': summaryTechnicalPrompt,
   'research-paper': summaryResearchPrompt,
+  'discussion-thread': summaryDiscussionPrompt,
+  'reference-docs': summaryDocsPrompt,
   'other': summaryOtherPrompt,
 };
 

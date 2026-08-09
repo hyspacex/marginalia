@@ -89,8 +89,8 @@ Four providers are supported: Anthropic, OpenAI, OpenRouter (all via Responses/M
 ### Summary Pipeline
 
 - Content script collects `PageMetadata` (`src/content/extraction/page-metadata.ts`: JSON-LD `@type`s, `og:type`, host/path, byline/siteName from Readability).
-- `src/shared/classify-content.ts` deterministically classifies into `ContentType` (`news-report | opinion-analysis | technical-blog | research-paper | other`); `null` means the LLM decides in-prompt.
-- Prompts live in `src/prompts/summary/` — `base.txt` (JSONL contract) + one template per content type + `classify-fallback.txt`. Composed by `buildSummaryPrompt` with memory context injected.
+- `src/shared/classify-content.ts` deterministically classifies into `ContentType` (`news-report | opinion-analysis | technical-blog | research-paper | discussion-thread | reference-docs | other`); `null` means the LLM decides in-prompt.
+- Prompts live in `src/prompts/summary/` — `base.txt` (JSONL contract) + one template per content type + `classify-fallback.txt`. Composed by `buildSummaryPrompt` with memory context injected. The `other` template is dynamic: instead of a fixed section list, the model designs 3-5 page-appropriate sections (always including `net-new`) — the JSONL parser accepts arbitrary section ids/headings, so no parser changes are needed for it.
 - The model emits JSONL lines: `{"kind":"meta"}`, then `{"kind":"section"}` per section, then a trailing `{"kind":"graph","keyClaims":[],"topics":[]}` line. Parsed by `createSummaryStreamParser` in `response-parsers.ts`.
 - Port protocol: `SUMMARY_META` → `SUMMARY_SECTION`* → `SUMMARY_DONE` (or `SUMMARY_ERROR`), independent of the annotation stream.
 

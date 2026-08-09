@@ -6,6 +6,8 @@ const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   'opinion-analysis': 'Opinion',
   'technical-blog': 'Technical',
   'research-paper': 'Research',
+  'discussion-thread': 'Discussion',
+  'reference-docs': 'Reference',
   'other': 'Article',
 };
 

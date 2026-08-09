@@ -108,7 +108,17 @@ describe('prompt builder', () => {
     expect(prompt.system).toContain('Content type: technical-blog');
     expect(prompt.system).toContain('Content type: research-paper');
     expect(prompt.system).toContain('Content type: opinion-analysis');
+    expect(prompt.system).toContain('Content type: discussion-thread');
+    expect(prompt.system).toContain('Content type: reference-docs');
     expect(prompt.system).toContain('Content type: other');
+  });
+
+  test('buildSummaryPrompt uses the dynamic schema for the other content type', () => {
+    const prompt = buildSummaryPrompt({ ...summaryRequest, contentType: 'other' });
+
+    expect(prompt.system).toContain('design 3-5 sections');
+    expect(prompt.system).toContain('exactly one net-new section');
+    expect(prompt.system).not.toContain('First decide the content type');
   });
 
   test('buildSummaryPrompt injects reader memory when provided', () => {
