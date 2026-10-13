@@ -47,11 +47,12 @@ function copyExtensionFiles(): Plugin {
         if (existsSync(src)) copyFileSync(src, dst);
       }
 
-      // -- Copy CSS --
+      // -- Copy CSS (shared design tokens prepended) --
+      const tokensCss = readFileSync(resolve(__dirname, 'src/shared/styles/tokens.css'), 'utf-8');
       for (const name of ['popup', 'options']) {
         const src = resolve(__dirname, `src/${name}/${name}.css`);
         if (existsSync(src)) {
-          copyFileSync(src, resolve(__dirname, `dist/${name}.css`));
+          writeFileSync(resolve(__dirname, `dist/${name}.css`), `${tokensCss}\n${readFileSync(src, 'utf-8')}`);
         }
       }
 

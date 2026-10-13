@@ -1,5 +1,5 @@
 import { render } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ModelOption, ProviderConfigInput, ProviderId, ReaderProfile, StoredProvidersState } from '@/shared/types';
 import { readingGraph } from '@/background/memory/reading-graph';
 import { providerDescriptors, getProviderDescriptor } from '@/background/llm/provider-registry';
@@ -58,6 +58,7 @@ export function Options() {
   const [modelCatalogMessage, setModelCatalogMessage] = useState<Partial<Record<ProviderId, string | null>>>({});
   const [autoSettings, setAutoSettings] = useState<AutoSummarizeSettings>(createDefaultAutoSummarizeSettings());
   const [siteInput, setSiteInput] = useState('');
+  const siteInputRef = useRef<HTMLInputElement>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -238,6 +239,7 @@ export function Options() {
     const normalized = normalizeSiteEntry(siteInput);
     if (!normalized) {
       setSiteError('Enter a valid domain, e.g. nytimes.com');
+      shakeElement(siteInputRef.current);
       return;
     }
     setSiteError(null);
@@ -273,8 +275,13 @@ export function Options() {
 
   return (
     <div class="options">
-      <h1>Marginalia</h1>
-      <p class="options-subtitle">Your AI reading companion — annotations, structured summaries, and memory.</p>
+      <header class="options-header">
+        <img class="options-logo" src="icons/icon-128.png" alt="" width="56" height="56" />
+        <div>
+          <h1>Marginalia</h1>
+          <p class="options-subtitle">Margin notes, structured summaries, and a memory of what you've read.</p>
+        </div>
+      </header>
 
       <section class="options-section">
         <div class="section-header">
@@ -421,16 +428,24 @@ export function Options() {
 
         <div class="options-actions">
           <button class="btn-primary" onClick={handleSave}>
-            {saved ? 'Saved!' : 'Save'}
+            {saved && <SuccessCheck />}
+            <span class="btn-label" key={saved ? 'saved' : 'save'}>{saved ? 'Saved' : 'Save'}</span>
           </button>
-          <button class="btn-secondary" onClick={handleTest} disabled={testStatus === 'testing'}>
-            {testStatus === 'testing'
-              ? 'Testing...'
-              : testStatus === 'success'
-                ? 'Connected!'
-                : testStatus === 'error'
-                  ? 'Failed'
-                  : 'Test Connection'}
+          <button
+            class={`btn-secondary${testStatus === 'testing' ? ' is-busy' : ''}`}
+            onClick={handleTest}
+            disabled={testStatus === 'testing'}
+          >
+            {testStatus === 'success' && <SuccessCheck />}
+            <span class="btn-label" key={testStatus}>
+              {testStatus === 'testing'
+                ? 'Testing…'
+                : testStatus === 'success'
+                  ? 'Connected'
+                  : testStatus === 'error'
+                    ? 'Failed'
+                    : 'Test Connection'}
+            </span>
           </button>
         </div>
 
@@ -470,8 +485,9 @@ export function Options() {
           Add a site
           <div class="site-add-row">
             <input
+              ref={siteInputRef}
               type="text"
-              class="options-input"
+              class={`options-input${siteError ? ' is-error' : ''}`}
               value={siteInput}
               placeholder="nytimes.com"
               onInput={(event) => {
@@ -587,6 +603,32 @@ export function Options() {
         </button>
       </section>
     </div>
+  );
+}
+
+function SuccessCheck() {
+  return (
+    <span class="success-check" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14">
+        <path d="M3 7.4l2.6 2.6L11 4.4" />
+      </svg>
+    </span>
+  );
+}
+
+// transitions.dev "error state shake": 80/60/80/60ms legs, each eased.
+function shakeElement(element: HTMLElement | null) {
+  if (!element?.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+  element.animate(
+    [
+      { transform: 'translateX(0)', easing: ease },
+      { transform: 'translateX(6px)', offset: 0.2857, easing: ease },
+      { transform: 'translateX(-6px)', offset: 0.5714, easing: ease },
+      { transform: 'translateX(4px)', offset: 0.7857, easing: ease },
+      { transform: 'translateX(0)' },
+    ],
+    { duration: 280 },
   );
 }
 

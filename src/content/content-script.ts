@@ -8,6 +8,7 @@ import { FloatingPill } from './pill/FloatingPill';
 import { SummaryCard } from './summary/SummaryCard';
 import { extractPageContent } from './extraction/readability';
 import { collectPageMetadata } from './extraction/page-metadata';
+import tokensCSS from '@/shared/styles/tokens.css?raw';
 import inlineCSS from './styles/inline.css?raw';
 
 const HOST_ID = 'marginalia-host';
@@ -48,6 +49,39 @@ let renderUI: (() => void) | null = null;
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 let summaryCloseTimer: ReturnType<typeof setTimeout> | null = null;
 let autoTrigger: AutoTriggerController | null = null;
+
+// --- Font scale (A-/A+ in the summary card, persisted across pages) ---
+const FONT_SCALES = [0.9, 1, 1.1, 1.25, 1.4];
+const FONT_SCALE_KEY = 'uiFontScale';
+let fontScaleIndex = 1;
+let hostElement: HTMLElement | null = null;
+
+function applyFontScale() {
+  hostElement?.style.setProperty('--m-scale', String(FONT_SCALES[fontScaleIndex]));
+}
+
+function adjustFontScale(direction: 1 | -1) {
+  const next = Math.min(FONT_SCALES.length - 1, Math.max(0, fontScaleIndex + direction));
+  if (next === fontScaleIndex) return;
+  fontScaleIndex = next;
+  applyFontScale();
+  void chrome.storage.local.set({ [FONT_SCALE_KEY]: FONT_SCALES[fontScaleIndex] });
+}
+
+function restoreFontScale() {
+  void chrome.storage.local.get(FONT_SCALE_KEY).then((stored) => {
+    const value = stored[FONT_SCALE_KEY];
+    if (typeof value !== 'number') return;
+    let nearest = fontScaleIndex;
+    for (let index = 0; index < FONT_SCALES.length; index++) {
+      if (Math.abs(FONT_SCALES[index] - value) < Math.abs(FONT_SCALES[nearest] - value)) {
+        nearest = index;
+      }
+    }
+    fontScaleIndex = nearest;
+    applyFontScale();
+  });
+}
 
 function setState(partial: Partial<UIState>) {
   Object.assign(state, partial);
@@ -94,8 +128,10 @@ function injectHighlightStyles() {
   style.textContent = `
     ::highlight(marginalia) {
       background-color: ${HIGHLIGHT_COLORS.background};
-      text-decoration: underline dotted;
+      text-decoration: underline;
       text-decoration-color: ${HIGHLIGHT_COLORS.underline};
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: 3px;
     }
   `;
   document.head.appendChild(style);
@@ -107,10 +143,12 @@ function injectHost() {
 
   const host = document.createElement('div');
   host.id = HOST_ID;
+  hostElement = host;
+  restoreFontScale();
   const shadow = host.attachShadow({ mode: 'open' });
 
   const style = document.createElement('style');
-  style.textContent = inlineCSS;
+  style.textContent = tokensCSS + inlineCSS;
   shadow.appendChild(style);
 
   const container = document.createElement('div');
@@ -172,6 +210,7 @@ function injectHost() {
               payload: { hostname: window.location.hostname },
             });
           },
+          onAdjustFont: adjustFontScale,
           onMouseEnter: showSummary,
           onMouseLeave: scheduleSummaryClose,
           onClose: () => {

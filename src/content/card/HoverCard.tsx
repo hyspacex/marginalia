@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
 import type { Annotation } from '@/shared/types';
 import { renderMarkdownToHtml } from '../render/markdown';
+import { usePresence } from '../render/use-presence';
+
+// Matches the closing transition in inline.css
+const CARD_EXIT_MS = 80;
 
 interface HoverCardProps {
   annotation: Annotation | null;
@@ -13,30 +17,38 @@ interface HoverCardProps {
 export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave }: HoverCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  // Keep the last annotation so the card can fade out with its content.
+  const shownRef = useRef<Annotation | null>(annotation);
+  if (annotation) shownRef.current = annotation;
+  const placedRef = useRef(false);
+
+  const [placed, setPlaced] = useState(false);
+  // True when the card moves between highlights while already open.
+  const [travel, setTravel] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [arrowStyle, setArrowStyle] = useState<Record<string, string>>({});
 
+  const presence = usePresence(annotation !== null && placed, CARD_EXIT_MS);
+  const shown = shownRef.current;
+
   const html = useMemo(() => {
-    if (!annotation) return '';
-    return renderMarkdownToHtml(annotation.content);
-  }, [annotation?.content]);
+    if (!shown) return '';
+    return renderMarkdownToHtml(shown.content);
+  }, [shown?.content]);
 
   useEffect(() => {
     if (!annotation || !triggerRect) {
-      setVisible(false);
+      placedRef.current = false;
+      setPlaced(false);
       return;
     }
 
-    // Wait a frame for the card to be rendered with display:block
-    console.log('[Marginalia] HoverCard useEffect', { annotationId: annotation.id, triggerRect: triggerRect.toJSON() });
+    // Wait a frame so the card is laid out (display:block) before measuring.
+    let cancelled = false;
     requestAnimationFrame(() => {
       const card = cardRef.current;
       const arrowEl = arrowRef.current;
-      if (!card) {
-        console.log('[Marginalia] HoverCard: cardRef is null!');
-        return;
-      }
+      if (!card || cancelled) return;
 
       const virtualEl = {
         getBoundingClientRect: () => triggerRect,
@@ -46,13 +58,15 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
         strategy: 'fixed',
         placement: 'top',
         middleware: [
-          offset(8),
+          offset(10),
           flip({ fallbackPlacements: ['bottom'] }),
           shift({ padding: 12 }),
-          ...(arrowEl ? [arrow({ element: arrowEl })] : []),
+          ...(arrowEl ? [arrow({ element: arrowEl, padding: 12 })] : []),
         ],
       }).then(({ x, y, placement, middlewareData }) => {
-        console.log('[Marginalia] computePosition result', { x, y, placement });
+        if (cancelled) return;
+        setTravel(placedRef.current);
+        placedRef.current = true;
         setPosition({ x, y });
 
         if (middlewareData.arrow && arrowEl) {
@@ -61,33 +75,38 @@ export function HoverCard({ annotation, triggerRect, onMouseEnter, onMouseLeave 
           setArrowStyle({
             left: middlewareData.arrow.x != null ? `${middlewareData.arrow.x}px` : '',
             top: middlewareData.arrow.y != null ? `${middlewareData.arrow.y}px` : '',
-            [staticSide]: '-4px',
+            [staticSide]: '-5px',
           });
         }
 
-        setVisible(true);
+        card.style.transformOrigin = placement.startsWith('bottom') ? '50% 0%' : '50% 100%';
+        setPlaced(true);
       });
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [annotation, triggerRect]);
 
-  // Always render the card — use display to hide/show.
-  // This keeps the ref stable so computePosition can measure it.
-  const show = annotation !== null;
+  // Stay in layout while open, measuring, or fading out, so the ref stays
+  // measurable and the close transition can play.
+  const mounted = annotation !== null || presence !== 'closed';
 
   return (
     <div
       ref={cardRef}
-      class={`marginalia-card ${visible && show ? 'visible' : ''}`}
+      class={`marginalia-card is-${presence}${travel ? ' is-travel' : ''}`}
       style={{
-        display: show ? 'block' : 'none',
-        left: `${position.x}px`,
-        top: `${position.y}px`,
+        display: mounted ? 'block' : 'none',
+        translate: `${position.x}px ${position.y}px`,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div class="marginalia-card-label">Marginalia</div>
+      <div class="marginalia-card-label">Margin note</div>
       <div
+        key={shown?.id}
         class="marginalia-card-body"
         dangerouslySetInnerHTML={{ __html: html }}
       />

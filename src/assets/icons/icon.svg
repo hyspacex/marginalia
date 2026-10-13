@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <title>Marginalia</title>
+  <desc>Three varied text lines on bordered warm paper; a golden highlight and short vermilion margin rule mark the middle passage.</desc>
+  <!-- The edge is 18% ink composited over paper, entirely inside the tile. -->
+  <rect x="16" y="16" width="96" height="96" rx="16" fill="#CCC7BD"/>
+  <rect x="18" y="18" width="92" height="92" rx="14" fill="#F3EDE2"/>
+  <rect x="30" y="54" width="48" height="20" rx="3" fill="#F2C46B"/>
+  <rect x="34" y="38" width="44" height="8" rx="1" fill="#1C1917"/>
+  <rect x="34" y="60" width="38" height="8" rx="1" fill="#1C1917"/>
+  <rect x="34" y="82" width="32" height="8" rx="1" fill="#1C1917"/>
+  <rect x="86" y="54" width="8" height="20" rx="1" fill="#C8442A"/>
+</svg>

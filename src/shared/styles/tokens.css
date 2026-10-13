@@ -1,0 +1,110 @@
+/*
+ * Shared design tokens. Prepended to the content-script shadow styles
+ * (matched by :host) and to the options/popup pages (matched by :root).
+ *
+ * Palette: warm paper, dark ink, one vermilion "rubric" accent.
+ * Motion: duration/easing/distance scale from transitions.dev.
+ */
+:root,
+:host {
+  /* Paper and ink */
+  --m-paper: #fbf8f2;
+  --m-paper-deep: #f3eee4;
+  --m-ink: #1c1917;
+  --m-text: #2e2925;
+  --m-text-strong: #1c1917;
+  --m-text-muted: #8a8178;
+  --m-surface-raised: rgba(60, 45, 30, 0.05);
+  --m-border: rgba(60, 45, 30, 0.11);
+  --m-border-strong: rgba(60, 45, 30, 0.18);
+
+  /* Rubric accent */
+  --m-accent: #c8442a;
+  --m-accent-strong: #a8341d;
+  --m-accent-soft: rgba(200, 68, 42, 0.09);
+  --m-accent-border: rgba(200, 68, 42, 0.3);
+  --m-on-accent: #fffaf3;
+
+  /* Highlighter (matches the on-page highlight) */
+  --m-mark: rgba(240, 178, 60, 0.28);
+
+  --m-danger: #b42318;
+  --m-danger-soft: rgba(180, 35, 24, 0.08);
+  --m-danger-border: rgba(180, 35, 24, 0.28);
+  --m-success: #3e7d5a;
+  --m-success-soft: rgba(62, 125, 90, 0.1);
+
+  /* Content-type inks */
+  --m-type-news-report: #2f6b8f;
+  --m-type-opinion-analysis: #b26b12;
+  --m-type-technical-blog: #3e7d5a;
+  --m-type-research-paper: #6b4fa0;
+  --m-type-discussion-thread: #a3456b;
+  --m-type-reference-docs: #6b6259;
+  --m-type-other: var(--m-accent);
+
+  /* Type */
+  --m-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --m-font-serif: Charter, 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+
+  /* Motion: durations */
+  --m-dur-stagger: 40ms;
+  --m-dur-micro: 80ms;
+  --m-dur-quick: 150ms;
+  --m-dur-fast: 250ms;
+  --m-dur-medium: 350ms;
+  --m-dur-slow: 400ms;
+  --m-dur-very-slow: 500ms;
+
+  /* Motion: easings */
+  --m-ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-ease-in-out: ease-in-out;
+  --m-ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --m-ease-toggle: cubic-bezier(0.34, 1.35, 0.64, 1);
+
+  /* Motion: distances, scales, blur */
+  --m-distance-micro: 4px;
+  --m-distance-base: 8px;
+  --m-distance-medium: 12px;
+  --m-distance-large: 16px;
+  --m-scale-panel: 0.97;
+  --m-scale-tooltip: 0.98;
+  --m-blur-small: 2px;
+  --m-blur-medium: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root,
+  :host {
+    --m-paper: #1d1a17;
+    --m-paper-deep: #151310;
+    --m-ink: #f6f1e8;
+    --m-text: #d9d2c8;
+    --m-text-strong: #f6f1e8;
+    --m-text-muted: #9c9389;
+    --m-surface-raised: rgba(246, 241, 232, 0.06);
+    --m-border: rgba(246, 241, 232, 0.1);
+    --m-border-strong: rgba(246, 241, 232, 0.17);
+
+    --m-accent: #f0866a;
+    --m-accent-strong: #f6a58d;
+    --m-accent-soft: rgba(240, 134, 106, 0.13);
+    --m-accent-border: rgba(240, 134, 106, 0.38);
+    --m-on-accent: #1d1a17;
+
+    --m-mark: rgba(240, 178, 60, 0.22);
+
+    --m-danger: #f4a097;
+    --m-danger-soft: rgba(244, 160, 151, 0.12);
+    --m-danger-border: rgba(244, 160, 151, 0.32);
+    --m-success: #8cc9a4;
+    --m-success-soft: rgba(140, 201, 164, 0.13);
+
+    --m-type-news-report: #8bbedb;
+    --m-type-opinion-analysis: #e8b260;
+    --m-type-technical-blog: #8cc9a4;
+    --m-type-research-paper: #b9a3e3;
+    --m-type-discussion-thread: #e293b3;
+    --m-type-reference-docs: #b5aca2;
+  }
+}

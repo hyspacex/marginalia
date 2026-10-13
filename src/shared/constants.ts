@@ -1,9 +1,10 @@
 export const EXTENSION_NAME = 'Marginalia';
 
 export const HIGHLIGHT_COLORS = {
-  background: 'rgba(255, 200, 80, 0.15)',
-  backgroundHover: 'rgba(255, 200, 80, 0.30)',
-  underline: 'rgba(180, 140, 50, 0.5)',
+  background: 'rgba(240, 178, 60, 0.18)',
+  backgroundHover: 'rgba(240, 178, 60, 0.32)',
+  // Vermilion "rubric" accent, matching --m-accent in tokens.css
+  underline: 'rgba(200, 68, 42, 0.5)',
 };
 
 export const CARD_CONFIG = {

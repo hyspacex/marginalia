@@ -119,7 +119,9 @@ The content script injects a Shadow DOM host containing:
 
 - `HoverCard`
 - `FloatingPill` (also surfaces summary-only auto runs)
-- `SummaryCard` (content-type badge, per-section markdown blocks, error state, quick-add footer)
+- `SummaryCard` (content-type badge + type-colored header mark and heading ticks, streaming status line, per-section markdown blocks, error state, quick-add footer, A−/A+ font-size control persisted as `uiFontScale` in `chrome.storage.local` and applied as a `--m-scale` CSS var on the shadow host)
+
+Visual design: warm paper/ink palette with a vermilion accent. Shared palette and motion tokens live in `src/shared/styles/tokens.css` (`:root, :host`), prepended to the shadow-DOM styles by the content script and to `options.css`/`popup.css` by the Vite copy step — edit tokens there, not per page. Motion follows transitions.dev patterns (tooltip, panel reveal, toast, texts reveal, text swap, shimmer, success check, error shake); `src/content/render/use-presence.ts` keeps cards mounted for their exit animation. Icon master SVGs are in `src/assets/icons/`.
 
 Highlighting is separate from the Shadow DOM and uses `CSS.highlights.set('marginalia', ...)`.
 

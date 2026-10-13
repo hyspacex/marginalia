@@ -1,56 +1,46 @@
+/*
+ * In-page UI (shadow DOM). Palette and motion tokens come from
+ * src/shared/styles/tokens.css, which is prepended at injection time.
+ * Transition patterns follow transitions.dev: tooltip (hover card),
+ * panel reveal (summary), toast (pill), texts reveal (sections),
+ * text swap, number pop-in, shimmer text and success check.
+ */
 :host {
   all: initial;
 
-  /* Design tokens */
-  --m-surface: rgba(255, 255, 255, 0.9);
-  --m-surface-raised: rgba(248, 250, 252, 0.85);
-  --m-border: rgba(15, 23, 42, 0.08);
-  --m-border-strong: rgba(15, 23, 42, 0.12);
-  --m-text: #334155;
-  --m-text-strong: #0f172a;
-  --m-text-muted: #7c8598;
-  --m-accent: #4f46e5;
-  --m-accent-strong: #4338ca;
-  --m-accent-soft: rgba(79, 70, 229, 0.09);
-  --m-accent-border: rgba(79, 70, 229, 0.25);
-  --m-danger: #b91c1c;
-  --m-danger-soft: rgba(185, 28, 28, 0.08);
+  --m-surface: color-mix(in srgb, var(--m-paper) 96%, transparent);
   --m-shadow:
     0 0 0 1px var(--m-border),
-    0 2px 6px rgba(15, 23, 42, 0.05),
-    0 16px 40px -12px rgba(15, 23, 42, 0.22);
+    0 1px 2px rgba(40, 28, 16, 0.05),
+    0 6px 16px -6px rgba(40, 28, 16, 0.12),
+    0 24px 48px -16px rgba(40, 28, 16, 0.22);
   --m-shadow-soft:
     0 0 0 1px var(--m-border),
-    0 1px 3px rgba(15, 23, 42, 0.06),
-    0 6px 18px -6px rgba(15, 23, 42, 0.16);
-  --m-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --m-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    0 1px 3px rgba(40, 28, 16, 0.06),
+    0 8px 22px -8px rgba(40, 28, 16, 0.2);
+
+  /* Type scale; --m-scale is set inline on the host by the A-/A+ control */
+  --m-scale: 1;
+  --m-fs-body: calc(15px * var(--m-scale));
+  --m-fs-card: calc(14.5px * var(--m-scale));
+  --m-fs-heading: calc(11px * var(--m-scale));
+  --m-fs-label: calc(11px * var(--m-scale));
+  --m-fs-badge: calc(10.5px * var(--m-scale));
+  --m-fs-ui: calc(12.5px * var(--m-scale));
+  --m-fs-code: calc(13px * var(--m-scale));
 }
 
 @media (prefers-color-scheme: dark) {
   :host {
-    --m-surface: rgba(24, 27, 35, 0.92);
-    --m-surface-raised: rgba(255, 255, 255, 0.05);
-    --m-border: rgba(255, 255, 255, 0.09);
-    --m-border-strong: rgba(255, 255, 255, 0.14);
-    --m-text: #cbd5e1;
-    --m-text-strong: #f1f5f9;
-    --m-text-muted: #8b95a7;
-    --m-accent: #a5b4fc;
-    --m-accent-strong: #c7d2fe;
-    --m-accent-soft: rgba(129, 140, 248, 0.15);
-    --m-accent-border: rgba(129, 140, 248, 0.35);
-    --m-danger: #fca5a5;
-    --m-danger-soft: rgba(248, 113, 113, 0.12);
     --m-shadow:
       0 0 0 1px var(--m-border),
-      0 2px 6px rgba(0, 0, 0, 0.3),
-      0 16px 40px -12px rgba(0, 0, 0, 0.6);
+      0 1px 2px rgba(0, 0, 0, 0.3),
+      0 6px 16px -6px rgba(0, 0, 0, 0.4),
+      0 24px 48px -16px rgba(0, 0, 0, 0.6);
     --m-shadow-soft:
       0 0 0 1px var(--m-border),
       0 1px 3px rgba(0, 0, 0, 0.3),
-      0 6px 18px -6px rgba(0, 0, 0, 0.5);
+      0 8px 22px -8px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -62,9 +52,10 @@
   font-family: var(--m-font);
   color: var(--m-text);
   background: var(--m-surface);
-  -webkit-backdrop-filter: blur(16px) saturate(1.5);
-  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
 }
 
 .marginalia-card *,
@@ -72,40 +63,82 @@
 .marginalia-card *::after,
 .marginalia-summary *,
 .marginalia-summary *::before,
-.marginalia-summary *::after {
+.marginalia-summary *::after,
+.marginalia-pill *,
+.marginalia-pill *::before,
+.marginalia-pill *::after {
   box-sizing: border-box;
 }
 
-/* ---------------------------------------------------------------- hover card */
+/* ---------------------------------------------------------------- hover card
+ * transitions.dev "tooltip": fade + 0.98 scale in, near-instant out,
+ * and a short travel (translate) when moving between highlights.
+ */
 
 .marginalia-card {
   position: fixed;
+  left: 0;
+  top: 0;
   z-index: 2147483647;
-  max-width: 360px;
-  padding: 12px 16px;
-  border: none;
-  border-radius: 14px;
+  max-width: 380px;
+  padding: 13px 18px 15px 20px;
+  border-radius: 12px;
   box-shadow: var(--m-shadow-soft);
-  font-size: 13px;
+  font-size: var(--m-fs-card);
   line-height: 1.6;
-  opacity: 0;
-  transform: translateY(6px) scale(0.98);
-  transition: opacity 180ms var(--m-ease), transform 220ms var(--m-ease);
   pointer-events: auto;
+  opacity: 0;
+  scale: var(--m-scale-tooltip);
+  transition:
+    opacity 50ms ease-out,
+    scale 50ms ease-out;
 }
 
-.marginalia-card.visible {
+/* Margin rule down the left edge */
+.marginalia-card::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--m-accent);
+  opacity: 0.85;
+}
+
+.marginalia-card.is-open {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  scale: 1;
+  transition:
+    opacity var(--m-dur-quick) ease-out,
+    scale var(--m-dur-quick) ease-out;
+}
+
+.marginalia-card.is-open.is-travel {
+  transition:
+    opacity var(--m-dur-quick) ease-out,
+    scale var(--m-dur-quick) ease-out,
+    translate 160ms var(--m-ease-smooth-out);
 }
 
 .marginalia-card-label {
-  font-size: 10px;
-  font-weight: 650;
+  font-size: calc(10.5px * var(--m-scale));
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--m-text-muted);
-  margin-bottom: 6px;
+  letter-spacing: 0.09em;
+  color: var(--m-accent);
+  margin-bottom: 5px;
+}
+
+.marginalia-card-body {
+  font-family: var(--m-font-serif);
+  color: var(--m-text);
+}
+
+/* Text swap when the card travels to another highlight */
+.marginalia-card.is-travel .marginalia-card-body {
+  animation: marginalia-swap-in var(--m-dur-quick) var(--m-ease-in-out) both;
 }
 
 .marginalia-card-body p {
@@ -125,8 +158,9 @@
   font-style: italic;
 }
 
-.marginalia-card-body code {
-  font-size: 12px;
+.marginalia-card-body code,
+.marginalia-summary-text code {
+  font-size: var(--m-fs-code);
   padding: 1px 5px;
   background: var(--m-surface-raised);
   border: 1px solid var(--m-border);
@@ -135,13 +169,21 @@
 
 .marginalia-card-arrow {
   position: absolute;
-  width: 8px;
-  height: 8px;
-  background: inherit;
+  width: 10px;
+  height: 10px;
+  background: var(--m-paper);
+  box-shadow: 1px 1px 0 0 var(--m-border);
   transform: rotate(45deg);
 }
 
-/* ---------------------------------------------------------------- pill */
+/* Flip the arrow's hairline when the card sits below the text */
+.marginalia-card-arrow[style*='top: -5px'] {
+  box-shadow: -1px -1px 0 0 var(--m-border);
+}
+
+/* ---------------------------------------------------------------- pill
+ * transitions.dev "toast": rise 16px with blur, slower in than out.
+ */
 
 .marginalia-pill {
   position: fixed;
@@ -150,100 +192,147 @@
   z-index: 2147483647;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 16px 9px 13px;
-  border: none;
+  gap: 9px;
+  height: 36px;
+  padding: 0 16px 0 14px;
   border-radius: 999px;
   box-shadow: var(--m-shadow-soft);
-  font-size: 12px;
-  font-weight: 550;
-  letter-spacing: 0.01em;
+  font-size: var(--m-fs-ui);
+  font-weight: 560;
+  letter-spacing: 0.005em;
+  color: var(--m-text-strong);
   cursor: pointer;
   user-select: none;
-  animation: marginalia-rise-in 360ms var(--m-ease-out) both;
   transition:
-    transform 200ms var(--m-ease),
-    box-shadow 200ms var(--m-ease),
-    color 200ms ease;
+    translate var(--m-dur-fast) var(--m-ease-smooth-out),
+    scale var(--m-dur-quick) var(--m-ease-smooth-out),
+    box-shadow var(--m-dur-fast) var(--m-ease-smooth-out),
+    color var(--m-dur-fast) ease;
+}
+
+.marginalia-pill.is-open {
+  animation: marginalia-toast-in var(--m-dur-medium) var(--m-ease-smooth-out) both;
+}
+
+.marginalia-pill.is-closing {
+  animation: marginalia-toast-out var(--m-dur-fast) var(--m-ease-smooth-out) both;
+  pointer-events: none;
 }
 
 .marginalia-pill:hover {
-  transform: translateY(-2px);
+  translate: 0 -2px;
   box-shadow: var(--m-shadow);
 }
 
 .marginalia-pill:active {
-  transform: translateY(0) scale(0.97);
+  translate: 0 0;
+  scale: 0.97;
 }
 
-.marginalia-pill-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+/* A short vertical margin mark rather than a generic dot */
+.marginalia-pill-mark {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
   background: var(--m-accent);
-  transition: background 250ms ease, box-shadow 250ms ease;
+  transition:
+    background var(--m-dur-fast) ease,
+    box-shadow var(--m-dur-fast) ease,
+    height var(--m-dur-fast) var(--m-ease-smooth-out);
 }
 
-.marginalia-pill.is-busy .marginalia-pill-dot {
-  animation: marginalia-breathe 1.4s ease-in-out infinite;
-}
-
-.marginalia-pill.is-busy {
-  color: var(--m-text-muted);
+.marginalia-pill.is-busy .marginalia-pill-mark {
+  animation: marginalia-mark-breathe 1.4s var(--m-ease-in-out) infinite;
 }
 
 .marginalia-pill.is-off {
   color: var(--m-text-muted);
 }
 
-.marginalia-pill.is-off .marginalia-pill-dot {
+.marginalia-pill.is-off .marginalia-pill-mark {
+  height: 8px;
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--m-text-muted);
 }
 
-@keyframes marginalia-breathe {
-  0%, 100% {
-    opacity: 0.35;
-    transform: scale(0.85);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
+.marginalia-pill-label {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
 }
 
-@keyframes marginalia-rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* transitions.dev "text states swap": rise in from 4px with 2px blur */
+.marginalia-swap {
+  display: inline-block;
+  animation: marginalia-swap-in var(--m-dur-quick) var(--m-ease-in-out) both;
 }
 
-/* ---------------------------------------------------------------- summary card */
+/* transitions.dev "number pop-in" */
+.marginalia-count {
+  display: inline-block;
+  margin-right: 0.28em;
+  font-variant-numeric: tabular-nums;
+  animation: marginalia-digit-in var(--m-dur-very-slow) cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}
+
+/* transitions.dev "shimmer text": a highlight band sweeps muted text */
+.marginalia-shimmer {
+  position: relative;
+  color: var(--m-text-muted);
+}
+
+.marginalia-shimmer::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--m-text-strong) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: marginalia-shimmer 2s linear infinite;
+}
+
+/* ---------------------------------------------------------------- summary card
+ * transitions.dev "panel reveal": translate + blur + fade, grown from the pill.
+ */
 
 .marginalia-summary {
   position: fixed;
-  bottom: 68px;
+  bottom: 72px;
   right: 24px;
   z-index: 2147483647;
-  width: min(420px, calc(100vw - 48px));
-  max-height: 70vh;
+  width: min(480px, calc(100vw - 48px));
+  max-height: 72vh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 16px 18px;
-  padding-right: 34px;
-  border: none;
+  padding: 0 24px 22px;
   border-radius: 16px;
   box-shadow: var(--m-shadow);
-  font-size: 13px;
-  line-height: 1.6;
-  animation: marginalia-summary-in 340ms var(--m-ease-out) both;
+  font-size: var(--m-fs-body);
+  line-height: 1.65;
+  transform-origin: 100% 100%;
   scrollbar-width: thin;
   scrollbar-color: var(--m-border-strong) transparent;
+}
+
+.marginalia-summary.is-open {
+  animation: marginalia-panel-in var(--m-dur-slow) var(--m-ease-smooth-out) both;
+}
+
+.marginalia-summary.is-closing {
+  animation: marginalia-panel-out var(--m-dur-medium) var(--m-ease-smooth-out) both;
+  pointer-events: none;
 }
 
 .marginalia-summary::-webkit-scrollbar {
@@ -261,217 +350,175 @@
   background: transparent;
 }
 
-@keyframes marginalia-summary-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.marginalia-summary-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: none;
-  color: var(--m-text-muted);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
+/* Sticky header so the controls stay reachable while scrolling */
+.marginalia-summary-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 0;
-  transition: color 150ms ease, background 150ms ease, transform 150ms var(--m-ease);
+  gap: 9px;
+  margin: 0 -24px 6px;
+  padding: 16px 14px 12px 24px;
+  background: linear-gradient(var(--m-paper) 70%, transparent);
 }
 
-.marginalia-summary-close:hover {
-  color: var(--m-text-strong);
-  background: var(--m-surface-raised);
-  transform: scale(1.08);
-}
-
-.marginalia-summary-close:active {
-  transform: scale(0.94);
+.marginalia-summary-mark {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--m-type-accent, var(--m-accent));
+  transition: background var(--m-dur-fast) ease;
 }
 
 .marginalia-summary-label {
-  font-size: 10px;
+  font-size: var(--m-fs-label);
   font-weight: 650;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
+  color: var(--m-text-strong);
+}
+
+/* transitions.dev "notification badge" pop */
+.marginalia-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  height: calc(19px * var(--m-scale));
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: var(--m-fs-badge);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--m-type-accent, var(--m-accent));
+  background: color-mix(in srgb, var(--m-type-accent, var(--m-accent)) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m-type-accent, var(--m-accent)) 22%, transparent);
+  animation: marginalia-badge-pop var(--m-dur-very-slow) var(--m-ease-bounce) both;
+}
+
+.marginalia-summary-tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.marginalia-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
   color: var(--m-text-muted);
-  margin-bottom: 12px;
+  font-family: var(--m-font);
+  cursor: pointer;
+  transition:
+    color var(--m-dur-quick) ease,
+    background var(--m-dur-quick) ease,
+    scale var(--m-dur-quick) var(--m-ease-smooth-out);
+}
+
+.marginalia-icon-btn:hover {
+  color: var(--m-text-strong);
+  background: var(--m-surface-raised);
+}
+
+.marginalia-icon-btn:active {
+  scale: 0.92;
+}
+
+.marginalia-icon-btn:focus-visible,
+.marginalia-quickadd-btn:focus-visible {
+  outline: 2px solid var(--m-accent-border);
+  outline-offset: 1px;
+}
+
+.marginalia-icon-btn svg {
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.marginalia-font-btn {
+  font-family: var(--m-font-serif);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.marginalia-font-btn.is-large {
+  font-size: 15px;
+}
+
+.marginalia-font-sign {
+  font-family: var(--m-font);
+  font-size: 9px;
+  margin-left: 1px;
+  translate: 0 -0.35em;
+}
+
+/* transitions.dev "texts reveal": heading, then body, rise in with blur */
+.marginalia-summary-section {
+  position: relative;
+}
+
+.marginalia-summary-section + .marginalia-summary-section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--m-border);
+}
+
+.marginalia-summary-heading,
+.marginalia-summary-text {
+  animation: marginalia-text-reveal var(--m-dur-very-slow) var(--m-ease-smooth-out) both;
+}
+
+.marginalia-summary-text {
+  animation-delay: var(--m-dur-stagger);
+}
+
+.marginalia-summary-heading {
+  font-size: var(--m-fs-heading);
+  font-weight: 650;
+  color: var(--m-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.marginalia-summary-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  background: var(--m-accent-soft);
-  color: var(--m-accent);
-  animation: marginalia-fade-in 250ms ease both;
+.marginalia-summary-heading::before {
+  content: '';
+  width: 10px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--m-type-accent, var(--m-accent));
+  flex: none;
 }
 
-.marginalia-summary-badge.is-news-report {
-  background: rgba(2, 132, 199, 0.1);
-  color: #0369a1;
+/* The lead section carries the summary's core */
+.marginalia-summary-section:first-child .marginalia-summary-heading {
+  color: var(--m-type-accent, var(--m-accent));
 }
 
-.marginalia-summary-badge.is-opinion-analysis {
-  background: rgba(217, 119, 6, 0.12);
-  color: #b45309;
-}
-
-.marginalia-summary-badge.is-technical-blog {
-  background: rgba(5, 150, 105, 0.1);
-  color: #047857;
-}
-
-.marginalia-summary-badge.is-research-paper {
-  background: rgba(124, 58, 237, 0.1);
-  color: #6d28d9;
-}
-
-.marginalia-summary-badge.is-discussion-thread {
-  background: rgba(225, 29, 72, 0.1);
-  color: #be123c;
-}
-
-.marginalia-summary-badge.is-reference-docs {
-  background: rgba(71, 85, 105, 0.12);
-  color: #475569;
-}
-
-@media (prefers-color-scheme: dark) {
-  .marginalia-summary-badge.is-news-report {
-    background: rgba(56, 189, 248, 0.14);
-    color: #7dd3fc;
-  }
-
-  .marginalia-summary-badge.is-opinion-analysis {
-    background: rgba(251, 191, 36, 0.14);
-    color: #fcd34d;
-  }
-
-  .marginalia-summary-badge.is-technical-blog {
-    background: rgba(52, 211, 153, 0.14);
-    color: #6ee7b7;
-  }
-
-  .marginalia-summary-badge.is-research-paper {
-    background: rgba(167, 139, 250, 0.16);
-    color: #c4b5fd;
-  }
-
-  .marginalia-summary-badge.is-discussion-thread {
-    background: rgba(251, 113, 133, 0.14);
-    color: #fda4af;
-  }
-
-  .marginalia-summary-badge.is-reference-docs {
-    background: rgba(148, 163, 184, 0.16);
-    color: #cbd5e1;
-  }
-}
-
-.marginalia-summary-section {
-  animation: marginalia-section-in 320ms var(--m-ease-out) both;
-}
-
-.marginalia-summary-section + .marginalia-summary-section {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--m-border);
-}
-
-@keyframes marginalia-section-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes marginalia-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.marginalia-summary-heading {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--m-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-bottom: 5px;
-}
-
-.marginalia-summary-error {
-  color: var(--m-danger);
-  background: var(--m-danger-soft);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 12px;
-  animation: marginalia-fade-in 250ms ease both;
-}
-
-.marginalia-summary-body .marginalia-summary-skeleton {
-  margin-top: 14px;
-}
-
-.marginalia-summary-footer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--m-border);
-}
-
-.marginalia-quickadd-btn {
-  border: 1px solid var(--m-accent-border);
-  background: transparent;
-  color: var(--m-accent);
-  font-family: var(--m-font);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 180ms ease, transform 180ms var(--m-ease);
-}
-
-.marginalia-quickadd-btn:hover {
-  background: var(--m-accent-soft);
-  transform: translateY(-1px);
-}
-
-.marginalia-quickadd-btn:active {
-  transform: translateY(0) scale(0.97);
-}
-
-.marginalia-quickadd-on {
-  font-size: 11px;
-  color: var(--m-text-muted);
+.marginalia-summary-section:first-child .marginalia-summary-text {
+  font-size: calc(var(--m-fs-body) * 1.06);
+  color: var(--m-text-strong);
 }
 
 .marginalia-summary-text {
   margin: 0;
-  line-height: 1.55;
+  font-family: var(--m-font-serif);
+  font-size: var(--m-fs-body);
+  line-height: 1.62;
+  color: var(--m-text);
+  text-wrap: pretty;
 }
 
 .marginalia-summary-text p,
@@ -488,72 +535,319 @@
 
 .marginalia-summary-text ul,
 .marginalia-summary-text ol {
-  padding-left: 16px;
+  padding-left: 18px;
 }
 
 .marginalia-summary-text li + li {
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .marginalia-summary-text li::marker {
-  color: var(--m-text-muted);
+  color: var(--m-accent);
 }
 
+/* Bold reads as a highlighter stroke, like the on-page highlights */
 .marginalia-summary-text strong {
   font-weight: 600;
   color: var(--m-text-strong);
+  background: linear-gradient(transparent 58%, var(--m-mark) 58%, var(--m-mark) 92%, transparent 92%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
-.marginalia-summary-text code {
-  font-size: 12px;
-  padding: 1px 5px;
-  background: var(--m-surface-raised);
-  border: 1px solid var(--m-border);
-  border-radius: 5px;
+.marginalia-summary-text a {
+  color: var(--m-accent-strong);
+  text-decoration-color: var(--m-accent-border);
+  text-underline-offset: 2px;
 }
 
-/* ---------------------------------------------------------------- skeleton */
+/* ---------------------------------------------------------------- thinking line
+ * transitions.dev "thinking states": a shimmering status that swaps phrases.
+ */
 
-.marginalia-summary-skeleton {
+.marginalia-thinking {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+  font-size: var(--m-fs-ui);
+  font-weight: 500;
 }
 
-.marginalia-skeleton-line {
-  height: 11px;
-  background: linear-gradient(
+.marginalia-summary-section + .marginalia-thinking {
+  margin-top: 18px;
+}
+
+.marginalia-thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--m-accent);
+  animation: marginalia-dot-pulse 1.4s var(--m-ease-in-out) infinite;
+}
+
+.marginalia-thinking-text {
+  display: inline-block;
+  position: relative;
+  color: var(--m-text-muted);
+  animation: marginalia-swap-in var(--m-dur-quick) var(--m-ease-in-out) both;
+}
+
+.marginalia-thinking-text::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
     90deg,
-    var(--m-surface-raised) 25%,
-    var(--m-border) 50%,
-    var(--m-surface-raised) 75%
+    transparent 0%,
+    transparent 40%,
+    var(--m-text-strong) 50%,
+    transparent 60%,
+    transparent 100%
   );
-  background-size: 200% 100%;
-  border-radius: 999px;
-  animation: marginalia-shimmer 1.6s ease-in-out infinite;
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: marginalia-shimmer 2s linear infinite;
 }
 
-.marginalia-skeleton-line.short {
-  width: 60%;
+/* ---------------------------------------------------------------- error */
+
+.marginalia-summary-error {
+  color: var(--m-danger);
+  background: var(--m-danger-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: var(--m-fs-ui);
+  line-height: 1.5;
+  animation: marginalia-text-reveal var(--m-dur-slow) var(--m-ease-smooth-out) both;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.marginalia-summary-footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--m-border);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.marginalia-quickadd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--m-accent-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--m-accent-strong);
+  font-family: var(--m-font);
+  font-size: var(--m-fs-ui);
+  font-weight: 560;
+  cursor: pointer;
+  transition:
+    background var(--m-dur-quick) ease,
+    border-color var(--m-dur-quick) ease,
+    scale var(--m-dur-quick) var(--m-ease-smooth-out);
+}
+
+.marginalia-quickadd-btn::before {
+  content: '+';
+  font-size: 1.15em;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.marginalia-quickadd-btn:hover {
+  background: var(--m-accent-soft);
+  border-color: var(--m-accent);
+}
+
+.marginalia-quickadd-btn:active {
+  scale: 0.97;
+}
+
+.marginalia-quickadd-on {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--m-fs-ui);
+  color: var(--m-text-muted);
+  animation: marginalia-swap-in var(--m-dur-fast) var(--m-ease-in-out) both;
+}
+
+/* transitions.dev "success check": rotate + blur + bob, then draw the stroke */
+.marginalia-check {
+  display: inline-flex;
+  color: var(--m-success);
+  animation:
+    marginalia-check-fade var(--m-dur-very-slow) var(--m-ease-smooth-out) both,
+    marginalia-check-rotate var(--m-dur-very-slow) var(--m-ease-smooth-out) both,
+    marginalia-check-blur var(--m-dur-very-slow) var(--m-ease-smooth-out) both,
+    marginalia-check-bob var(--m-dur-very-slow) cubic-bezier(0.34, 1.35, 0.64, 1) both;
+}
+
+.marginalia-check svg {
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marginalia-check path {
+  stroke-dasharray: 12;
+  stroke-dashoffset: 12;
+  animation: marginalia-check-draw var(--m-dur-very-slow) var(--m-ease-smooth-out) var(--m-dur-micro) forwards;
+}
+
+/* ---------------------------------------------------------------- keyframes */
+
+@keyframes marginalia-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-distance-large)) scale(var(--m-scale-panel));
+    filter: blur(var(--m-blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes marginalia-panel-out {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--m-distance-base)) scale(var(--m-scale-panel));
+    filter: blur(var(--m-blur-small));
+  }
+}
+
+@keyframes marginalia-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-distance-large)) scale(var(--m-scale-panel));
+    filter: blur(var(--m-blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes marginalia-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(var(--m-distance-large)) scale(var(--m-scale-panel));
+    filter: blur(var(--m-blur-small));
+  }
+}
+
+@keyframes marginalia-text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-distance-medium));
+    filter: blur(var(--m-blur-medium));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes marginalia-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-distance-micro));
+    filter: blur(var(--m-blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes marginalia-digit-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-distance-base));
+    filter: blur(var(--m-blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes marginalia-badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+    filter: blur(var(--m-blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
 }
 
 @keyframes marginalia-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
 }
 
-/* ---------------------------------------------------------------- motion */
+@keyframes marginalia-mark-breathe {
+  0%, 100% { opacity: 0.4; transform: scaleY(0.6); }
+  50% { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes marginalia-dot-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes marginalia-check-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes marginalia-check-rotate { from { transform: rotate(80deg); } to { transform: rotate(0deg); } }
+@keyframes marginalia-check-blur { from { filter: blur(6px); } to { filter: blur(0); } }
+@keyframes marginalia-check-bob { from { translate: 0 10px; } to { translate: 0 0; } }
+@keyframes marginalia-check-draw { to { stroke-dashoffset: 0; } }
+
+/* ---------------------------------------------------------------- reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
   .marginalia-card,
+  .marginalia-card *,
   .marginalia-pill,
-  .marginalia-pill-dot,
+  .marginalia-pill *,
+  .marginalia-pill *::before,
   .marginalia-summary,
-  .marginalia-summary-section,
-  .marginalia-summary-badge,
-  .marginalia-summary-error,
-  .marginalia-skeleton-line {
-    animation: none;
-    transition: none;
+  .marginalia-summary *,
+  .marginalia-summary *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .marginalia-check path {
+    stroke-dashoffset: 0;
   }
 }
