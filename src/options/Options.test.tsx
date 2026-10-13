@@ -15,7 +15,7 @@ const mocked = vi.hoisted(() => {
         apiKey: 'anthropic-key',
         baseUrl: 'https://api.anthropic.com',
         modelMode: 'catalog',
-        modelId: 'claude-sonnet-4-6',
+        modelId: 'claude-sonnet-5-5',
         options: {},
       },
       openai: {
@@ -95,11 +95,11 @@ describe('Options', () => {
               payload: {
                 models: [
                   {
-                    id: 'claude-sonnet-4-6',
-                    name: 'Claude Sonnet 4.6',
-                    contextWindow: 200000,
-                    costPer1kInput: 0.003,
-                    costPer1kOutput: 0.015,
+                    id: 'claude-sonnet-5-5',
+                    name: 'Claude Sonnet 5.5',
+                    contextWindow: 1000000,
+                    costPer1kInput: 0.002,
+                    costPer1kOutput: 0.01,
                   },
                 ],
               },
@@ -158,12 +158,12 @@ describe('Options', () => {
     });
 
     fireEvent.change(screen.getByLabelText(/Model for auto-runs/), {
-      target: { value: 'claude-sonnet-4-6' },
+      target: { value: 'claude-opus-5-5' },
     });
 
     await waitFor(() => {
       expect(chrome.storage.local.set).toHaveBeenCalledWith(expect.objectContaining({
-        autoSummarizeSettings: expect.objectContaining({ autoModelId: 'claude-sonnet-4-6' }),
+        autoSummarizeSettings: expect.objectContaining({ autoModelId: 'claude-opus-5-5' }),
       }));
     });
   });

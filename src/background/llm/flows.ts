@@ -27,9 +27,12 @@ export interface StreamAnnotationsResult {
   usage: TokenUsage;
 }
 
-const ANNOTATION_MAX_OUTPUT_TOKENS = 4096;
-const SUMMARY_MAX_OUTPUT_TOKENS = 2048;
-const PROFILE_MAX_OUTPUT_TOKENS = 2048;
+// Headroom for thinking models (current Claude models think by default, as do
+// Ollama cloud deepseek/kimi): reasoning tokens count against the completion
+// budget before any JSONL is emitted. These are ceilings, not targets.
+const ANNOTATION_MAX_OUTPUT_TOKENS = 16000;
+const SUMMARY_MAX_OUTPUT_TOKENS = 16000;
+const PROFILE_MAX_OUTPUT_TOKENS = 8000;
 
 export function createLlmService(deps: LlmServiceDeps = {}) {
   const now = deps.now || (() => Date.now());

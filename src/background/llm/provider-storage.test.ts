@@ -76,7 +76,7 @@ describe('provider storage', () => {
       apiKey: 'legacy-key',
       baseUrl: 'https://legacy.anthropic.test',
       modelMode: 'catalog',
-      modelId: 'claude-sonnet-4-6',
+      modelId: 'claude-sonnet-5-5',
       options: {},
     });
     expect(state.configsByProvider.openai).toEqual(getProviderDescriptor('openai').normalizeConfig());
@@ -95,6 +95,7 @@ describe('provider storage', () => {
     const state = createDefaultProvidersState('openai');
     state.configsByProvider.anthropic = getProviderDescriptor('anthropic').normalizeConfig({
       apiKey: 'anthropic-key',
+      baseUrl: 'https://api.anthropic.com',
       modelId: 'claude-haiku-3-5-20241022',
     });
     state.configsByProvider.openai = getProviderDescriptor('openai').normalizeConfig({
@@ -110,11 +111,12 @@ describe('provider storage', () => {
       version: 1,
       activeProviderId: 'openai',
       configsByProvider: {
+        // The retired Haiku 3.5 id maps to the current Haiku.
         anthropic: {
           apiKey: 'anthropic-key',
           baseUrl: 'https://api.anthropic.com',
           modelMode: 'catalog',
-          modelId: 'claude-haiku-3-5-20241022',
+          modelId: 'claude-haiku-5-5',
           options: {},
         },
         openai: {
@@ -133,7 +135,7 @@ describe('provider storage', () => {
         },
         local: {
           apiKey: '',
-          baseUrl: 'http://100.82.7.89:8317/v1',
+          baseUrl: 'http://localhost:8317/v1',
           modelMode: 'catalog',
           modelId: 'local-model',
           options: {},

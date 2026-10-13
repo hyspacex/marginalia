@@ -11,6 +11,8 @@ import {
 // (llama.cpp, vLLM, LM Studio, Ollama, ...). The base URL points at the API
 // root including /v1; a pasted full completions URL is tolerated.
 
+const NON_CHAT_MODEL_PATTERN = /(^|[/-])(image|imagine|video|tts|whisper|embedding)|auto-review/i;
+
 function apiRoot(config: ProviderConfig): string {
   return config.baseUrl.replace(/\/+$/, '').replace(/\/chat\/completions$/, '');
 }
@@ -176,7 +178,9 @@ export function createLocalTransport(
       return entries
         .map((entry: any): ModelOption | null => {
           const id = typeof entry?.id === 'string' ? entry.id.trim() : '';
-          if (!id) return null;
+          // Proxies such as CLIProxyAPI also list image/video models that
+          // can't do chat completions.
+          if (!id || NON_CHAT_MODEL_PATTERN.test(id)) return null;
 
           return {
             id,

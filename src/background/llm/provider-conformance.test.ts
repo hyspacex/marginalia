@@ -366,7 +366,7 @@ describeProviderTransportConformance({
   config: {
     providerId: 'local',
     apiKey: 'sk-local-test',
-    baseUrl: 'http://100.82.7.89:8317/v1',
+    baseUrl: 'http://localhost:8317/v1',
     modelMode: 'custom',
     modelId: 'qwen3-32b',
     resolvedModel: 'qwen3-32b',

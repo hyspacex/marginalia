@@ -19,7 +19,7 @@ Marginalia `0.2.0` is an MV3 Chrome extension that combines:
 - streamed inline annotations (toolbar click)
 - structured, content-type-adaptive page summaries streamed section-by-section as JSONL
 - auto-summarize on a user-managed site allowlist (summary-only sessions, optional cheaper model override)
-- multi-provider LLM support (Anthropic, OpenAI, OpenRouter, and a Local OpenAI-compatible chat-completions provider)
+- multi-provider LLM support: Anthropic, OpenAI, OpenRouter (all with API keys), and a Local OpenAI-compatible chat-completions provider
 - a reading graph in Dexie used for "net-new to you" summary context
 
 Note: an earlier "Active Reading Graph v1" connections system (typed claim edges, connection scoring, deferred extraction) was designed but never committed — `notes/v0.2.0-connections-roadmap.md` preserves that design. Do not assume claim edges exist in code.
@@ -77,7 +77,13 @@ The source `manifest.json` is a development template with `.ts` source paths. Th
 
 ### Provider System
 
-Four providers are supported: Anthropic, OpenAI, OpenRouter (all via Responses/Messages APIs), and Local (OpenAI-compatible `/chat/completions` for self-hosted servers; its origin needs a `host_permissions` entry in both manifests to bypass CORS).
+Four providers are supported:
+
+- `anthropic` — Messages API with an API key, called with `fetch` from the service worker. Current models (Opus/Sonnet 5.5, Fable 5.1) get `fallbacks: "default"` + `anthropic-beta: server-side-fallback-2026-07-01` on `api.anthropic.com` only (not Haiku 5.5, which has no fallback); `stop_reason: "refusal"` raises a `ProviderError`. Thinking is on by default for current Claude models and counts against `max_tokens`, hence the 16K output caps in `flows.ts`.
+- `openai`, `openrouter` — Responses APIs with API keys.
+- `local` — OpenAI-compatible `/chat/completions` (CLIProxyAPI, llama.cpp, vLLM, ...). Generic in source (`http://localhost:8317/v1`, placeholder model). A personal build sets its name, server address and model list in `config/local-provider.json` (gitignored; template in `config/local-provider.example.json`), which `vite.config.ts` injects as `__MARGINALIA_LOCAL_PROVIDER__` and adds to `host_permissions`. "Refresh models" reads the live list and drops image/video models.
+
+Plain-HTTP servers need `host_permissions` to bypass CORS: the generated manifest always has localhost plus the configured server's origin. Never commit personal server addresses, model lists, or keys — the repo is public; they belong in the gitignored config file.
 
 1. `provider-registry.ts` for descriptors and defaults
 2. `provider.ts` for shared transport/error types

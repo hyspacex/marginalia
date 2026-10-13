@@ -2,6 +2,28 @@ import { defineConfig, type Plugin, build as viteBuild } from 'vite';
 import { resolve } from 'path';
 import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
+// Optional personal provider config (gitignored): a self-hosted
+// OpenAI-compatible server's address and model list. Without it the build
+// ships a generic "Local (OpenAI-compatible)" provider on localhost.
+// See config/local-provider.example.json.
+const LOCAL_PROVIDER_FILE = resolve(__dirname, 'config/local-provider.json');
+const localProvider = existsSync(LOCAL_PROVIDER_FILE)
+  ? JSON.parse(readFileSync(LOCAL_PROVIDER_FILE, 'utf-8'))
+  : null;
+
+// Plain-HTTP inference servers need host permissions so extension fetches
+// skip CORS: localhost always, plus the configured server's origin.
+const hostPermissions = ['http://localhost/*', 'http://127.0.0.1/*'];
+if (typeof localProvider?.baseUrl === 'string') {
+  const { protocol, hostname } = new URL(localProvider.baseUrl);
+  const pattern = `${protocol}//${hostname}/*`;
+  if (!hostPermissions.includes(pattern)) hostPermissions.push(pattern);
+}
+
+const define = {
+  __MARGINALIA_LOCAL_PROVIDER__: JSON.stringify(localProvider),
+};
+
 const aliases = {
   '@': resolve(__dirname, 'src'),
   'react': 'preact/compat',
@@ -24,6 +46,7 @@ function copyExtensionFiles(): Plugin {
         await viteBuild({
           configFile: false,
           resolve: { alias: aliases },
+          define,
           build: {
             outDir: resolve(__dirname, 'dist'),
             emptyOutDir: false,
@@ -93,9 +116,7 @@ function copyExtensionFiles(): Plugin {
         description: 'AI-powered reading companion — contextual annotations for any web page',
         version: pkg.version,
         permissions: ['activeTab', 'alarms', 'storage', 'tabs'],
-        // Local OpenAI-compatible inference endpoint (plain HTTP, no CORS
-        // guarantees) — host permission exempts extension fetches from CORS.
-        host_permissions: ['http://100.82.7.89/*'],
+        host_permissions: hostPermissions,
         action: {
           default_icon: {
             '16': 'icons/icon-16.png',
@@ -128,6 +149,7 @@ function copyExtensionFiles(): Plugin {
 
 export default defineConfig({
   resolve: { alias: aliases },
+  define,
   build: {
     outDir: 'dist',
     emptyOutDir: true,

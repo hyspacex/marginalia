@@ -9,3 +9,6 @@ coverage/
 .env.local
 .gstack/
 notes/
+
+# Personal provider config (server address, model list); see config/local-provider.example.json
+config/local-provider.json

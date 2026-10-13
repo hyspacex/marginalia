@@ -1,0 +1,16 @@
+{
+  "name": "My OpenAI-compatible server",
+  "description": "Self-hosted chat-completions endpoint (CLIProxyAPI, llama.cpp, vLLM, LM Studio, Ollama, ...).",
+  "baseUrl": "http://192.0.2.10:8317/v1",
+  "defaultModelId": "my-model",
+  "models": [
+    {
+      "id": "my-model",
+      "name": "My Model"
+    },
+    {
+      "id": "my-other-model",
+      "name": "My Other Model"
+    }
+  ]
+}

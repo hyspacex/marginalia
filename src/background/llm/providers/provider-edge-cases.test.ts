@@ -118,6 +118,69 @@ describe('provider transport edge cases', () => {
     });
   });
 
+  test('Anthropic transport opts current models into server-side fallback on the Claude API only', async () => {
+    const calls: Array<{ headers: Headers; body: any }> = [];
+    const transport = createAnthropicTransport({
+      fetch: vi.fn<typeof fetch>(async (_input, init) => {
+        calls.push({ headers: new Headers(init?.headers), body: JSON.parse(String(init?.body)) });
+        return new Response(JSON.stringify({ content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' }), { status: 200 });
+      }),
+    });
+    const request = (config: ProviderConfig) => ({ config, systemPrompt: 'sys', userPrompt: 'user', maxOutputTokens: 10 });
+
+    await transport.generateText(request({ ...anthropicConfig, modelId: 'claude-opus-5-5', resolvedModel: 'claude-opus-5-5' }));
+    await transport.generateText(request({ ...anthropicConfig, modelId: 'claude-haiku-5-5', resolvedModel: 'claude-haiku-5-5' }));
+    await transport.generateText(request({
+      ...anthropicConfig,
+      baseUrl: 'https://proxy.example.test',
+      modelId: 'claude-opus-5-5',
+      resolvedModel: 'claude-opus-5-5',
+    }));
+
+    expect(calls[0].body.fallbacks).toBe('default');
+    expect(calls[0].headers.get('anthropic-beta')).toBe('server-side-fallback-2026-07-01');
+    // Haiku 5.5 has no server-side fallback; proxies don't support the parameter.
+    for (const call of calls.slice(1)) {
+      expect(call.body.fallbacks).toBeUndefined();
+      expect(call.headers.get('anthropic-beta')).toBeNull();
+    }
+  });
+
+  test('Anthropic transport turns refusals into errors instead of empty results', async () => {
+    const generateTransport = createAnthropicTransport({
+      fetch: vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+        content: [],
+        stop_reason: 'refusal',
+        stop_details: { type: 'refusal', category: 'cyber' },
+      }), { status: 200 })),
+    });
+
+    await expect(generateTransport.generateText({
+      config: anthropicConfig,
+      systemPrompt: 'sys',
+      userPrompt: 'user',
+      maxOutputTokens: 10,
+    })).rejects.toMatchObject({ providerId: 'anthropic', message: 'Claude declined this request (cyber)' });
+
+    const streamTransport = createAnthropicTransport({
+      fetch: vi.fn<typeof fetch>(async () => createSseResponse([
+        'data: {"type":"message_start","message":{"usage":{"input_tokens":4}}}\n\n',
+        'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":""}}\n\n',
+        'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}\n\n',
+        'data: {"type":"message_delta","delta":{"stop_reason":"refusal","stop_details":null},"usage":{"output_tokens":2}}\n\n',
+      ])),
+    });
+    const deltas: string[] = [];
+
+    await expect(streamTransport.streamText({
+      config: anthropicConfig,
+      systemPrompt: 'sys',
+      userPrompt: 'user',
+      maxOutputTokens: 10,
+    }, (delta) => deltas.push(delta))).rejects.toMatchObject({ message: 'Claude declined this request' });
+    expect(deltas).toEqual(['partial']);
+  });
+
   test('OpenAI transport falls back to output arrays and handles network failures', async () => {
     const transport = createOpenAiTransport({
       fetch: vi.fn<typeof fetch>(async () => new Response(JSON.stringify({

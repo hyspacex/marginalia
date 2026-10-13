@@ -18,6 +18,52 @@ interface AnthropicRequest {
   system: string;
   messages: AnthropicMessage[];
   stream?: boolean;
+  fallbacks?: 'default';
+}
+
+const API_VERSION = '2023-06-01';
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+const DEFAULT_BASE_URL = 'https://api.anthropic.com';
+
+// Models whose safety classifiers can decline a request and that accept
+// server-side fallback: a declined request is re-run on the model Anthropic
+// recommends for that refusal category, inside the same call (and on the same
+// stream). Haiku 5.5 has no fallback, so it is not listed.
+const FALLBACK_MODELS = new Set([
+  'claude-opus-5-5',
+  'claude-opus-5',
+  'claude-sonnet-5-5',
+  'claude-fable-5-1',
+  'claude-fable-5',
+]);
+
+function usesFallback(config: ProviderConfig): boolean {
+  // Server-side fallback exists on the Claude API itself, not on proxies.
+  return config.baseUrl === DEFAULT_BASE_URL && FALLBACK_MODELS.has(config.resolvedModel);
+}
+
+function messageBody(config: ProviderConfig, body: AnthropicRequest): AnthropicRequest {
+  return usesFallback(config) ? { ...body, fallbacks: 'default' } : body;
+}
+
+function buildHeaders(config: ProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-api-key': config.apiKey,
+    'anthropic-version': API_VERSION,
+    'anthropic-dangerous-direct-browser-access': 'true',
+  };
+  if (usesFallback(config)) {
+    headers['anthropic-beta'] = FALLBACK_BETA;
+  }
+  return headers;
+}
+
+// A decline (classifier or model) is an HTTP 200 with stop_reason "refusal".
+// With fallbacks it means every model in the chain declined.
+function refusalError(stopDetails: any): ProviderError {
+  const category = typeof stopDetails?.category === 'string' ? ` (${stopDetails.category})` : '';
+  return new ProviderError('anthropic', 'unknown', `Claude declined this request${category}`);
 }
 
 function extractText(data: any): string {
@@ -72,7 +118,7 @@ function normalizeModelCatalogEntry(entry: any): ModelOption | null {
   return {
     id,
     name,
-    contextWindow: null,
+    contextWindow: typeof entry?.max_input_tokens === 'number' ? entry.max_input_tokens : null,
     costPer1kInput: null,
     costPer1kOutput: null,
   };
@@ -88,13 +134,8 @@ async function anthropicFetch(
   try {
     response = await fetchImpl(`${config.baseUrl}/v1/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
+      headers: buildHeaders(config),
+      body: JSON.stringify(messageBody(config, body)),
     });
   } catch (error) {
     throw new ProviderError('anthropic', 'network', String(error));
@@ -117,7 +158,7 @@ async function anthropicGet(fetchImpl: typeof fetch, config: ProviderConfig, pat
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': API_VERSION,
         'anthropic-dangerous-direct-browser-access': 'true',
       },
     });
@@ -148,6 +189,10 @@ export function createAnthropicTransport(
       });
 
       const data = await response.json();
+      if (data?.stop_reason === 'refusal') {
+        throw refusalError(data.stop_details);
+      }
+
       return {
         text: extractText(data),
         usage: extractUsage(data),
@@ -180,6 +225,8 @@ export function createAnthropicTransport(
           throw new ProviderError('anthropic', 'protocol', 'Failed to parse Anthropic SSE event');
         }
 
+        // Thinking deltas (on by default for current models) carry `thinking`,
+        // not `text`, so only answer text reaches the parser.
         if (event.type === 'content_block_delta' && event.delta?.text) {
           onTextDelta(event.delta.text);
         }
@@ -190,6 +237,10 @@ export function createAnthropicTransport(
 
         if (event.type === 'message_delta' && event.usage) {
           usage.outputTokens = event.usage.output_tokens || 0;
+        }
+
+        if (event.type === 'message_delta' && event.delta?.stop_reason === 'refusal') {
+          throw refusalError(event.delta.stop_details);
         }
 
         if (event.type === 'error') {

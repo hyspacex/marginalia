@@ -12,20 +12,35 @@ import { createLocalTransport } from './providers/local';
 
 const DEFAULT_MODEL_MODE = 'catalog' as const;
 
+// Claude API pricing per 1K tokens (Haiku 5.5: prompts up to 100K tokens).
 const ANTHROPIC_MODELS: readonly ModelOption[] = [
   {
-    id: 'claude-sonnet-4-6',
-    name: 'Claude Sonnet 4.6',
-    contextWindow: 200000,
-    costPer1kInput: 0.003,
-    costPer1kOutput: 0.015,
+    id: 'claude-opus-5-5',
+    name: 'Claude Opus 5.5',
+    contextWindow: 1000000,
+    costPer1kInput: 0.004,
+    costPer1kOutput: 0.02,
   },
   {
-    id: 'claude-haiku-3-5-20241022',
-    name: 'Claude Haiku 3.5',
-    contextWindow: 200000,
-    costPer1kInput: 0.0008,
-    costPer1kOutput: 0.004,
+    id: 'claude-sonnet-5-5',
+    name: 'Claude Sonnet 5.5',
+    contextWindow: 1000000,
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.01,
+  },
+  {
+    id: 'claude-haiku-5-5',
+    name: 'Claude Haiku 5.5',
+    contextWindow: 1000000,
+    costPer1kInput: 0.0001,
+    costPer1kOutput: 0.0005,
+  },
+  {
+    id: 'claude-fable-5-1',
+    name: 'Claude Fable 5.1',
+    contextWindow: 1000000,
+    costPer1kInput: 0.01,
+    costPer1kOutput: 0.05,
   },
 ];
 
@@ -63,19 +78,41 @@ const OPENROUTER_MODELS: readonly ModelOption[] = [
   },
 ];
 
-const LOCAL_MODELS: readonly ModelOption[] = [
-  {
-    id: 'local-model',
-    name: 'Default local model (refresh to list yours)',
-    contextWindow: null,
-    costPer1kInput: null,
-    costPer1kOutput: null,
-  },
-];
+// The Local provider is generic in source. A personal build can point it at a
+// specific server with config/local-provider.json (gitignored), which
+// vite.config.ts injects as __MARGINALIA_LOCAL_PROVIDER__.
+const LOCAL_CONFIG = typeof __MARGINALIA_LOCAL_PROVIDER__ !== 'undefined'
+  ? __MARGINALIA_LOCAL_PROVIDER__
+  : null;
+
+const LOCAL_PLACEHOLDER_MODEL_ID = 'local-model';
+
+function localModel(id: string, name: string): ModelOption {
+  return { id, name, contextWindow: null, costPer1kInput: null, costPer1kOutput: null };
+}
+
+const configuredLocalModels = (LOCAL_CONFIG?.models ?? [])
+  .filter((model) => typeof model?.id === 'string' && model.id.trim())
+  .map((model) => localModel(model.id.trim(), model.name?.trim() || model.id.trim()));
+
+const LOCAL_MODELS: readonly ModelOption[] = configuredLocalModels.length > 0
+  ? configuredLocalModels
+  : [localModel(LOCAL_PLACEHOLDER_MODEL_ID, 'Default local model (refresh to list yours)')];
+
+const LOCAL_DEFAULT_MODEL_ID = LOCAL_MODELS.some((model) => model.id === LOCAL_CONFIG?.defaultModelId)
+  ? LOCAL_CONFIG!.defaultModelId!
+  : LOCAL_MODELS[0].id;
 
 const ANTHROPIC_LEGACY_MODEL_IDS: Record<string, string> = {
-  'claude-sonnet-4-5-20250929': 'claude-sonnet-4-6',
+  'claude-sonnet-4-5-20250929': 'claude-sonnet-5-5',
+  'claude-sonnet-4-6': 'claude-sonnet-5-5',
+  'claude-haiku-3-5-20241022': 'claude-haiku-5-5',
 };
+
+// A configured model list replaces the placeholder id saved by generic builds.
+const LOCAL_LEGACY_MODEL_IDS: Record<string, string> = LOCAL_DEFAULT_MODEL_ID === LOCAL_PLACEHOLDER_MODEL_ID
+  ? {}
+  : { [LOCAL_PLACEHOLDER_MODEL_ID]: LOCAL_DEFAULT_MODEL_ID };
 
 const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
   anthropic: createProviderDescriptor({
@@ -83,7 +120,7 @@ const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
     name: 'Anthropic',
     description: 'Claude via the Anthropic Messages API.',
     defaultBaseUrl: 'https://api.anthropic.com',
-    defaultModelId: 'claude-sonnet-4-6',
+    defaultModelId: 'claude-opus-5-5',
     models: ANTHROPIC_MODELS,
     legacyModelIds: ANTHROPIC_LEGACY_MODEL_IDS,
     fields: [
@@ -176,11 +213,13 @@ const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
   }),
   local: createProviderDescriptor({
     id: 'local',
-    name: 'Local (OpenAI-compatible)',
-    description: 'A self-hosted OpenAI-compatible chat-completions server (llama.cpp, vLLM, LM Studio, Ollama, ...).',
-    defaultBaseUrl: 'http://100.82.7.89:8317/v1',
-    defaultModelId: 'local-model',
+    name: LOCAL_CONFIG?.name || 'Local (OpenAI-compatible)',
+    description: LOCAL_CONFIG?.description
+      || 'A self-hosted OpenAI-compatible chat-completions server (CLIProxyAPI, llama.cpp, vLLM, LM Studio, Ollama, ...).',
+    defaultBaseUrl: LOCAL_CONFIG?.baseUrl || 'http://localhost:8317/v1',
+    defaultModelId: LOCAL_DEFAULT_MODEL_ID,
     models: LOCAL_MODELS,
+    legacyModelIds: LOCAL_LEGACY_MODEL_IDS,
     fields: [
       {
         key: 'apiKey',
@@ -195,7 +234,7 @@ const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
         label: 'Base URL',
         type: 'url',
         target: 'baseUrl',
-        placeholder: 'http://100.82.7.89:8317/v1',
+        placeholder: 'http://localhost:8317/v1',
         helpText: 'API root including /v1. Requests go to <base>/chat/completions and <base>/models.',
       },
     ],
